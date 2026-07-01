@@ -15,9 +15,22 @@
 		B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cowboy Shooting Game.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
+/* Begin PBXFileSystemSynchronizedBuildFileExceptionSet section */
+		509388C02FF3B0AD005A56DA /* Exceptions for "Cowboy Shooting Game" folder in "Cowboy Shooting Game" target */ = {
+			isa = PBXFileSystemSynchronizedBuildFileExceptionSet;
+			membershipExceptions = (
+				Info.plist,
+			);
+			target = B6C75CA92FEBC6B900E0797A /* Cowboy Shooting Game */;
+		};
+/* End PBXFileSystemSynchronizedBuildFileExceptionSet section */
+
 /* Begin PBXFileSystemSynchronizedRootGroup section */
 		B6C75CAC2FEBC6B900E0797A /* Cowboy Shooting Game */ = {
 			isa = PBXFileSystemSynchronizedRootGroup;
+			exceptions = (
+				509388C02FF3B0AD005A56DA /* Exceptions for "Cowboy Shooting Game" folder in "Cowboy Shooting Game" target */,
+			);
 			path = "Cowboy Shooting Game";
 			sourceTree = "<group>";
 		};
@@ -264,6 +277,7 @@
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cowboy Shooting Game/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
@@ -301,6 +315,7 @@
 				"DEVELOPMENT_TEAM[sdk=iphoneos*]" = 9VBW89A4U3;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
+				INFOPLIST_FILE = "Cowboy Shooting Game/Info.plist";
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
 				INFOPLIST_KEY_UIApplicationSupportsIndirectInputEvents = YES;
 				INFOPLIST_KEY_UILaunchScreen_Generation = YES;
