@@ -7,12 +7,14 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		B6C630C02FF65BA000B22B90 /* Assets.xcassets in Resources */ = {isa = PBXBuildFile; fileRef = B6C630BF2FF65BA000B22B90 /* Assets.xcassets */; };
 		B6C75CB92FEBC6D000E0797A /* Local.xcconfig in Resources */ = {isa = PBXBuildFile; fileRef = B6C75CB82FEBC6CB00E0797A /* Local.xcconfig */; };
 		B6C75CBB2FEBC6F100E0797A /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B6C75CBA2FEBC6EB00E0797A /* .gitignore */; };
 		B6C75CBD2FEBC77400E0797A /* Local.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = B6C75CBC2FEBC77300E0797A /* Local.xcconfig.example */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		B6C630BF2FF65BA000B22B90 /* Assets.xcassets */ = {isa = PBXFileReference; lastKnownFileType = folder.assetcatalog; path = Assets.xcassets; sourceTree = "<group>"; };
 		B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cowboy Shooting Game.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B6C75CB82FEBC6CB00E0797A /* Local.xcconfig */ = {isa = PBXFileReference; lastKnownFileType = text.xcconfig; path = Local.xcconfig; sourceTree = "<group>"; };
 		B6C75CBA2FEBC6EB00E0797A /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
@@ -46,6 +48,7 @@
 				B6C75CBA2FEBC6EB00E0797A /* .gitignore */,
 				B6C75CAC2FEBC6B900E0797A /* Cowboy Shooting Game */,
 				B6C75CAB2FEBC6B900E0797A /* Products */,
+				B6C630BF2FF65BA000B22B90 /* Assets.xcassets */,
 			);
 			sourceTree = "<group>";
 		};
@@ -123,6 +126,7 @@
 			files = (
 				B6C75CB92FEBC6D000E0797A /* Local.xcconfig in Resources */,
 				B6C75CBB2FEBC6F100E0797A /* .gitignore in Resources */,
+				B6C630C02FF65BA000B22B90 /* Assets.xcassets in Resources */,
 				B6C75CBD2FEBC77400E0797A /* Local.xcconfig.example in Resources */,
 			);
 			runOnlyForDeploymentPostprocessing = 0;
