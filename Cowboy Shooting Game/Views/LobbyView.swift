@@ -49,6 +49,13 @@ struct LobbyView: View {
             shot.configure(connection: connection)
             countdown.configure(connection: connection, shot: shot)
         }
+        .onChange(of: connection.state) { _, newState in
+            // Whenever a session ends (peer left / we cancelled), clear the round
+            // so the next duel — or the next challenger — starts fresh.
+            if case .connected = newState {} else {
+                countdown.reset()
+            }
+        }
     }
 
     // MARK: Pieces

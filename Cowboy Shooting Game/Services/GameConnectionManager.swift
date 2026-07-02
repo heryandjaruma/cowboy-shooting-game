@@ -106,6 +106,19 @@ final class GameConnectionManager: ObservableObject {
         stopAll()
         isHost = true
         isClockSynced = true // the host clock is the reference.
+        beginAdvertising()
+    }
+
+    /// After a challenger leaves, keep hosting and wait for the next one.
+    /// (isHost / isClockSynced are already set from the original host session.)
+    private func resumeHosting() {
+        beginAdvertising()
+    }
+
+    /// (Re)start the Bonjour listener so a challenger can join.
+    private func beginAdvertising() {
+        listener?.cancel()
+        listener = nil
         do {
             let listener = try NWListener(using: Self.makeParameters())
             listener.service = NWListener.Service(name: myName, type: Self.serviceType)
@@ -213,11 +226,10 @@ final class GameConnectionManager: ObservableObject {
             sendHandshake()
             receiveNextMessage()
             if !isHost { startClockSync() }
-        case .failed(let error):
-            state = .failed(reason: "Connection failed: \(error.localizedDescription)")
-            teardownConnection()
-        case .cancelled:
-            if case .connected = state { state = .idle }
+        case .failed, .cancelled:
+            // A dropped connection (peer left, or a real failure) is handled the
+            // same, graceful way — never surfaced as an error to the player.
+            peerDidDisconnect()
         default:
             break
         }
@@ -276,9 +288,10 @@ final class GameConnectionManager: ObservableObject {
                     self.handleReceived(type: type, data: data)
                 }
 
-                if let error {
-                    self.state = .failed(reason: "Receive error: \(error.localizedDescription)")
-                    self.teardownConnection()
+                if error != nil {
+                    // Peer closed the stream (e.g. they hit Cancel) — treat as a
+                    // clean disconnect rather than an error.
+                    self.peerDidDisconnect()
                     return
                 }
                 // Re-arm only after processing, which keeps messages strictly in order.
@@ -363,13 +376,22 @@ final class GameConnectionManager: ObservableObject {
 
     // MARK: - Teardown
 
-    /// Drop the active peer connection but stay in the current mode.
-    private func teardownConnection() {
+    /// The peer connection dropped (they left, or it failed). Clean up and, if we
+    /// were hosting, go back to waiting for a new challenger; a joiner returns to
+    /// the lobby. A no-op if we already tore the connection down ourselves (Cancel).
+    private func peerDidDisconnect() {
+        guard connection != nil else { return }
         connection?.cancel()
         connection = nil
+
+        if isHost {
+            resumeHosting() // stay in the room, wait for another challenger.
+        } else {
+            state = .idle   // the host left — back to the lobby.
+        }
     }
 
-    /// Tear everything down and return to idle.
+    /// Tear everything down and return to the lobby (the local Cancel button).
     func stopAll() {
         connection?.cancel()
         connection = nil
@@ -378,6 +400,8 @@ final class GameConnectionManager: ObservableObject {
         browser?.cancel()
         browser = nil
         discoveredPeers = []
+        isHost = false
+        isClockSynced = false
         state = .idle
     }
 
