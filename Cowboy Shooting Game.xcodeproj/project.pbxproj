@@ -7,7 +7,7 @@
 	objects = {
 
 /* Begin PBXFileReference section */
-		B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cowboy Shooting Game.app"; sourceTree = BUILT_PRODUCTS_DIR; };
+		B79C6E622FF4E00E00CDB394 /* Cowboy Shooting Game.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cowboy Shooting Game.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 /* End PBXFileReference section */
 
 /* Begin PBXFileSystemSynchronizedRootGroup section */
@@ -33,16 +33,8 @@
 			isa = PBXGroup;
 			children = (
 				B6C75CAC2FEBC6B900E0797A /* Cowboy Shooting Game */,
-				B6C75CAB2FEBC6B900E0797A /* Products */,
+				B79C6E622FF4E00E00CDB394 /* Cowboy Shooting Game.app */,
 			);
-			sourceTree = "<group>";
-		};
-		B6C75CAB2FEBC6B900E0797A /* Products */ = {
-			isa = PBXGroup;
-			children = (
-				B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */,
-			);
-			name = Products;
 			sourceTree = "<group>";
 		};
 /* End PBXGroup section */
@@ -67,7 +59,7 @@
 			packageProductDependencies = (
 			);
 			productName = "Cowboy Shooting Game";
-			productReference = B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */;
+			productReference = B79C6E622FF4E00E00CDB394 /* Cowboy Shooting Game.app */;
 			productType = "com.apple.product-type.application";
 		};
 /* End PBXNativeTarget section */
@@ -95,7 +87,7 @@
 			mainGroup = B6C75CA12FEBC6B900E0797A;
 			minimizedProjectReferenceProxies = 1;
 			preferredProjectObjectVersion = 77;
-			productRefGroup = B6C75CAB2FEBC6B900E0797A /* Products */;
+			productRefGroup = B6C75CA12FEBC6B900E0797A;
 			projectDirPath = "";
 			projectRoot = "";
 			targets = (
@@ -249,8 +241,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FBW872HJHV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -263,8 +257,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ren.mark.Cowboy-Shooting-Game";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rayne.Cowboy-Shooting-Game";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
@@ -280,8 +275,10 @@
 			buildSettings = {
 				ASSETCATALOG_COMPILER_APPICON_NAME = AppIcon;
 				ASSETCATALOG_COMPILER_GLOBAL_ACCENT_COLOR_NAME = AccentColor;
+				CODE_SIGN_IDENTITY = "Apple Development";
 				CODE_SIGN_STYLE = Automatic;
 				CURRENT_PROJECT_VERSION = 1;
+				DEVELOPMENT_TEAM = FBW872HJHV;
 				ENABLE_PREVIEWS = YES;
 				GENERATE_INFOPLIST_FILE = YES;
 				INFOPLIST_KEY_UIApplicationSceneManifest_Generation = YES;
@@ -294,8 +291,9 @@
 					"@executable_path/Frameworks",
 				);
 				MARKETING_VERSION = 1.0;
-				PRODUCT_BUNDLE_IDENTIFIER = "ren.mark.Cowboy-Shooting-Game";
+				PRODUCT_BUNDLE_IDENTIFIER = "com.rayne.Cowboy-Shooting-Game";
 				PRODUCT_NAME = "$(TARGET_NAME)";
+				PROVISIONING_PROFILE_SPECIFIER = "";
 				STRING_CATALOG_GENERATE_SYMBOLS = YES;
 				SWIFT_APPROACHABLE_CONCURRENCY = YES;
 				SWIFT_DEFAULT_ACTOR_ISOLATION = MainActor;
