@@ -122,6 +122,43 @@ nonisolated final class GameProtocol: NWProtocolFramerImplementation {
     }
 }
 
+// MARK: - Game-event channels
+
+/// `.gameEvent` payloads are multiplexed by a leading channel byte so several
+/// controllers can share the single connection without stepping on each other.
+nonisolated enum GameChannel: UInt8 {
+    case match = 1   // ready / countdown coordination (CountdownController)
+    case shot = 2    // draw / verdict (ShotController)
+    case clock = 3   // clock-offset estimation (GameConnectionManager)
+}
+
+/// Little-endian encoding for the scalar values we ship inside game events.
+nonisolated enum BinaryCoding {
+    static func encode(_ value: Double) -> Data {
+        var bits = value.bitPattern.littleEndian
+        return withUnsafeBytes(of: &bits) { Data($0) }
+    }
+
+    static func decode(_ data: Data) -> Double? {
+        guard data.count >= 8 else { return nil }
+        var bits: UInt64 = 0
+        withUnsafeMutableBytes(of: &bits) { $0.copyBytes(from: data.prefix(8)) }
+        return Double(bitPattern: UInt64(littleEndian: bits))
+    }
+
+    static func encode(_ value: UInt64) -> Data {
+        var v = value.littleEndian
+        return withUnsafeBytes(of: &v) { Data($0) }
+    }
+
+    static func decodeU64(_ data: Data) -> UInt64? {
+        guard data.count >= 8 else { return nil }
+        var v: UInt64 = 0
+        withUnsafeMutableBytes(of: &v) { $0.copyBytes(from: data.prefix(8)) }
+        return UInt64(littleEndian: v)
+    }
+}
+
 // MARK: - Attaching a message type to NWProtocolFramer.Message
 
 nonisolated extension NWProtocolFramer.Message {

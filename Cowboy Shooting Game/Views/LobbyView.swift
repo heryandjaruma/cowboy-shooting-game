@@ -11,6 +11,8 @@ import Network
 
 struct LobbyView: View {
     @StateObject private var connection = GameConnectionManager()
+    @StateObject private var shot = ShotController()
+    @StateObject private var countdown = CountdownController()
 
     var body: some View {
         NavigationStack {
@@ -42,6 +44,17 @@ struct LobbyView: View {
             }
             .padding()
             .navigationTitle("Cowboy Duel")
+        }
+        .task {
+            shot.configure(connection: connection)
+            countdown.configure(connection: connection, shot: shot)
+        }
+        .onChange(of: connection.state) { _, newState in
+            // Whenever a session ends (peer left / we cancelled), clear the round
+            // so the next duel — or the next challenger — starts fresh.
+            if case .connected = newState {} else {
+                countdown.reset()
+            }
         }
     }
 
@@ -115,29 +128,82 @@ struct LobbyView: View {
     }
 
     private func connectedCard(peerName: String) -> some View {
-        VStack(spacing: 12) {
-            Image(systemName: "checkmark.seal.fill")
-                .font(.largeTitle)
-                .foregroundStyle(.green)
-            Text("Connected to \(peerName)")
+        VStack(spacing: 20) {
+            Text("Facing \(peerName)")
                 .font(.headline)
 
-            // Scaffolding hook: prove the pipe works end-to-end.
-            Button("Send test shot") {
-                connection.sendEvent(Data("bang".utf8))
-            }
-            .buttonStyle(.bordered)
-
-            if !connection.eventLog.isEmpty {
-                VStack(alignment: .leading, spacing: 4) {
-                    ForEach(Array(connection.eventLog.enumerated()), id: \.offset) { _, line in
-                        Text(line).font(.caption.monospaced())
+            if let outcome = shot.outcome {
+                resultView(outcome)
+            } else {
+                switch countdown.phase {
+                case .notReady:
+                    if connection.isClockSynced {
+                        Button { countdown.pressReady() } label: {
+                            Label("Ready", systemImage: "hand.raised.fill")
+                                .frame(maxWidth: .infinity)
+                        }
+                        .buttonStyle(.borderedProminent)
+                    } else {
+                        VStack(spacing: 8) {
+                            ProgressView()
+                            Text("Getting in position…")
+                                .foregroundStyle(.secondary)
+                        }
                     }
+
+                case .waiting:
+                    VStack(spacing: 8) {
+                        ProgressView()
+                        Text("Step right up.")
+                            .font(.title3)
+                            .foregroundStyle(.secondary)
+                    }
+
+                case .counting(let n):
+                    Text("\(n)")
+                        .font(.system(size: 96, weight: .heavy, design: .rounded))
+                        .foregroundStyle(.orange)
+                        .transition(.scale.combined(with: .opacity))
+                        .id(n)
+
+                case .fire:
+                    fireView
                 }
-                .frame(maxWidth: .infinity, alignment: .leading)
-                .padding()
-                .background(.thinMaterial, in: RoundedRectangle(cornerRadius: 12))
             }
+        }
+        .controlSize(.large)
+        .animation(.snappy, value: countdown.phase)
+        .animation(.snappy, value: shot.outcome)
+    }
+
+    private var fireView: some View {
+        Group {
+            if shot.didFire {
+                VStack(spacing: 8) {
+                    ProgressView()
+                    Text("Waiting for the verdict…")
+                        .foregroundStyle(.secondary)
+                }
+            } else {
+                Button { shot.fire() } label: {
+                    Label("DRAW!", systemImage: "scope")
+                        .font(.largeTitle.bold())
+                        .frame(maxWidth: .infinity)
+                        .padding(.vertical, 12)
+                }
+                .buttonStyle(.borderedProminent)
+                .tint(.red)
+            }
+        }
+    }
+
+    private func resultView(_ outcome: ShotController.Outcome) -> some View {
+        VStack(spacing: 12) {
+            Text(outcome == .winner ? "🏆 Winner!" : "💀 Loser")
+                .font(.largeTitle.bold())
+                .foregroundStyle(outcome == .winner ? .green : .red)
+            Button("Play again") { countdown.reset() }
+                .buttonStyle(.bordered)
         }
     }
 
