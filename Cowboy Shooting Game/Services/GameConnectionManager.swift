@@ -50,8 +50,27 @@ final class GameConnectionManager: ObservableObject {
 
     @Published private(set) var state: ConnectionState = .idle
     @Published private(set) var discoveredPeers: [DiscoveredPeer] = []
-    /// Scaffolding: a running log of received game events. Replace with real game state.
-    @Published private(set) var eventLog: [String] = []
+
+    /// True on the device that is hosting — it also acts as the duel referee.
+    @Published private(set) var isHost = false
+
+    /// True once this device's monotonic clock is aligned with the host's, so
+    /// scheduled times can be shared. Always true on the host (it *is* the reference).
+    @Published private(set) var isClockSynced = false
+
+    /// Handlers for received `.gameEvent`s, keyed by channel (the first payload byte).
+    private var eventHandlers: [UInt8: (Data) -> Void] = [:]
+
+    // Clock synchronization (NTP-style). `clockOffsetNanos` is (hostClock − localClock);
+    // it's 0 on the host. Only the joiner estimates it.
+    private var clockOffsetNanos: Int64 = 0
+    private var bestRoundTripNanos: UInt64 = .max
+    private var clockSyncSamplesRemaining = 0
+
+    private enum ClockOp {
+        static let ping: UInt8 = 0  // joiner → host: + t0
+        static let pong: UInt8 = 1  // host → joiner: + t0 + t1 + t2
+    }
 
     /// Human-readable name advertised to / shown by the other device.
     let myName: String
@@ -67,6 +86,17 @@ final class GameConnectionManager: ObservableObject {
     init(myName: String? = nil) {
         // UIDevice.current is main-actor isolated; read it inside this @MainActor init.
         self.myName = myName ?? UIDevice.current.name
+        onEvent(channel: GameChannel.clock.rawValue) { [weak self] body in
+            self?.handleClockEvent(body)
+        }
+    }
+
+    /// Convert an absolute host-clock timestamp into this device's own monotonic
+    /// uptime clock, so both peers can act at the same real instant.
+    func localUptime(forHostNanos hostNanos: UInt64) -> UInt64 {
+        if isHost { return hostNanos }
+        let local = Int64(bitPattern: hostNanos) - clockOffsetNanos
+        return local < 0 ? 0 : UInt64(local)
     }
 
     // MARK: - Hosting
@@ -74,6 +104,8 @@ final class GameConnectionManager: ObservableObject {
     /// Begin advertising this device as a host and wait for a joiner.
     func startHosting() {
         stopAll()
+        isHost = true
+        isClockSynced = true // the host clock is the reference.
         do {
             let listener = try NWListener(using: Self.makeParameters())
             listener.service = NWListener.Service(name: myName, type: Self.serviceType)
@@ -122,6 +154,8 @@ final class GameConnectionManager: ObservableObject {
     /// Begin searching for nearby hosts.
     func startBrowsing() {
         stopAll()
+        isHost = false
+        isClockSynced = false // the joiner must sync to the host first.
         let browser = NWBrowser(for: .bonjour(type: Self.serviceType, domain: nil),
                                 using: Self.makeParameters())
 
@@ -178,6 +212,7 @@ final class GameConnectionManager: ObservableObject {
             state = .connected(peerName: "…")
             sendHandshake()
             receiveNextMessage()
+            if !isHost { startClockSync() }
         case .failed(let error):
             state = .failed(reason: "Connection failed: \(error.localizedDescription)")
             teardownConnection()
@@ -190,8 +225,18 @@ final class GameConnectionManager: ObservableObject {
 
     // MARK: - Sending
 
-    /// Discrete, must-arrive gameplay event (shot fired, hit, round start…).
-    func sendEvent(_ payload: Data) { send(payload, as: .gameEvent) }
+    /// Register a handler for a game-event channel. Re-registering replaces it.
+    func onEvent(channel: UInt8, _ handler: @escaping (Data) -> Void) {
+        eventHandlers[channel] = handler
+    }
+
+    /// Send a channel-tagged gameplay event (must-arrive). The channel byte is
+    /// prepended to `body`; the receiver's handler is given `body` without it.
+    func sendEvent(channel: UInt8, body: Data = Data()) {
+        var payload = Data([channel])
+        payload.append(body)
+        send(payload, as: .gameEvent)
+    }
 
     /// High-frequency snapshot (position / aim). Latest-value-wins in spirit.
     func sendPlayerState(_ payload: Data) { send(payload, as: .playerState) }
@@ -248,11 +293,70 @@ final class GameConnectionManager: ObservableObject {
             let name = String(decoding: data, as: UTF8.self)
             state = .connected(peerName: name.isEmpty ? "Opponent" : name)
         case .gameEvent:
-            eventLog.append("event · \(data.count) bytes")
+            guard let channel = data.first else { break }
+            eventHandlers[channel]?(Data(data.dropFirst()))
         case .playerState:
             // TODO: feed into the game loop.
             break
         case .invalid:
+            break
+        }
+    }
+
+    // MARK: - Clock synchronization
+
+    /// Joiner: probe the host a handful of times and keep the offset from the
+    /// round-trip with the least delay (the least-jittered, most accurate sample).
+    private func startClockSync() {
+        guard !isHost else { return }
+        bestRoundTripNanos = .max
+        clockSyncSamplesRemaining = 5
+        sendPing()
+    }
+
+    private func sendPing() {
+        let t0 = DispatchTime.now().uptimeNanoseconds
+        sendEvent(channel: GameChannel.clock.rawValue,
+                  body: Data([ClockOp.ping]) + BinaryCoding.encode(t0))
+    }
+
+    private func handleClockEvent(_ body: Data) {
+        guard let op = body.first else { return }
+        let rest = Data(body.dropFirst())
+
+        switch op {
+        case ClockOp.ping: // host side: timestamp receipt and reply
+            let t1 = DispatchTime.now().uptimeNanoseconds
+            guard let t0 = BinaryCoding.decodeU64(rest) else { return }
+            let t2 = DispatchTime.now().uptimeNanoseconds
+            var payload = Data([ClockOp.pong])
+            payload += BinaryCoding.encode(t0)
+            payload += BinaryCoding.encode(t1)
+            payload += BinaryCoding.encode(t2)
+            sendEvent(channel: GameChannel.clock.rawValue, body: payload)
+
+        case ClockOp.pong: // joiner side: compute offset & round-trip delay
+            let t3 = DispatchTime.now().uptimeNanoseconds
+            guard rest.count >= 24,
+                  let t0 = BinaryCoding.decodeU64(rest),
+                  let t1 = BinaryCoding.decodeU64(Data(rest.dropFirst(8))),
+                  let t2 = BinaryCoding.decodeU64(Data(rest.dropFirst(16))) else { return }
+
+            let roundTrip = (Int64(bitPattern: t3) - Int64(bitPattern: t0))
+                          - (Int64(bitPattern: t2) - Int64(bitPattern: t1))
+            let offset = ((Int64(bitPattern: t1) - Int64(bitPattern: t0))
+                        + (Int64(bitPattern: t2) - Int64(bitPattern: t3))) / 2
+
+            if UInt64(max(roundTrip, 0)) < bestRoundTripNanos {
+                bestRoundTripNanos = UInt64(max(roundTrip, 0))
+                clockOffsetNanos = offset
+            }
+            isClockSynced = true
+
+            clockSyncSamplesRemaining -= 1
+            if clockSyncSamplesRemaining > 0 { sendPing() }
+
+        default:
             break
         }
     }
@@ -284,6 +388,7 @@ final class GameConnectionManager: ObservableObject {
         let tcp = NWProtocolTCP.Options()
         tcp.enableKeepalive = true
         tcp.keepaliveIdle = 2
+        tcp.noDelay = true // disable Nagle: send our tiny timing messages immediately.
 
         let parameters = NWParameters(tls: nil, tcp: tcp)
         parameters.includePeerToPeer = true
