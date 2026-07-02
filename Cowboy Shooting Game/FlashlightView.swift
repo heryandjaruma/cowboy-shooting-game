@@ -4,9 +4,9 @@ import CoreHaptics
 
 struct FlashlightView: View {
     @State private var isFiring = false
-    
     @State private var hapticEngine: CHHapticEngine?
-
+    @State private var audioPlayer: AVAudioPlayer?
+    
     var body: some View {
         VStack(spacing: 40) {
             Image(systemName: isFiring ? "flame.fill" : "flashlight.off.fill")
@@ -78,6 +78,23 @@ struct FlashlightView: View {
             print("Torch could not be used: \(error)")
         }
     }
+    
+    // MARK: - Audio (What else would it be)
+    func playGunshotAudio() {
+            guard let soundAsset = NSDataAsset(name: "mixedgun-rayne") else {
+                print("Could not find the audio asset in the catalog.")
+                return
+            }
+            
+            do {
+                audioPlayer = try AVAudioPlayer(data: soundAsset.data)
+                
+                audioPlayer?.prepareToPlay()
+                audioPlayer?.play()
+            } catch {
+                print("Failed to play audio: \(error.localizedDescription)")
+            }
+        }
     
     // MARK: - CoreHaptics Logic
     
