@@ -17,16 +17,10 @@ protocol TriggerControllerDelegate: AnyObject {
 }
  
 final class TriggerController: ObservableObject {
- 
-    /// Satu-satunya instance yang boleh dipakai di seluruh app.
-    /// Jangan bikin `TriggerController()` baru di View lain — pakai `.shared`.
     static let shared = TriggerController()
  
     weak var delegate: TriggerControllerDelegate?
  
-    /// Closure aksi custom, di-set/diganti oleh View yang sedang aktif.
-    /// Ini yang bikin fungsi trigger-nya bisa dipakai ulang di banyak View
-    /// tanpa harus bikin controller baru.
     var onTrigger: ((TriggerDirection) -> Void)?
  
     @Published private(set) var state = TriggerState() {
@@ -136,7 +130,6 @@ final class TriggerController: ObservableObject {
             return
         }
  
-        // Throttle update frekuensi tinggi supaya sesuai kecepatan hardware CoreAudio
         if !forceImmediate {
             let now = Date()
             guard now.timeIntervalSince(lastSliderUpdateTime) >= throttleInterval else { return }
