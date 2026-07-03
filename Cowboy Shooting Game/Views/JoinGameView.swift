@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import SpriteKit
 
 //Scrollbar
 private struct ScrollOffsetKey: PreferenceKey {
@@ -93,6 +94,7 @@ struct CowboyScrollView<Content: View>: View {
 struct JoinGameView: View {
     @StateObject private var controller = JoinGameController()
     @Environment(\.dismiss) private var dismiss
+    @State private var navigateToGame = false
 
     var body: some View {
         ZStack {
@@ -115,6 +117,7 @@ struct JoinGameView: View {
                             ForEach(controller.rooms) { room in
                                 Button {
                                     controller.join(room: room)
+                                    navigateToGame = true
                                 } label: {
                                     Text(room.displayName)
                                         .frame(maxWidth:.infinity, alignment: .center)
@@ -137,9 +140,21 @@ struct JoinGameView: View {
                 Spacer()
             }
         }
-        .toolbar(.hidden, for: .navigationBar)
-    }
-}
+                .toolbar(.hidden, for: .navigationBar)
+                .fullScreenCover(isPresented: $navigateToGame) {
+                    GeometryReader { geometry in
+                        SpriteView(scene: createGameScene(size: geometry.size))
+                            .ignoresSafeArea()
+                    }
+                }
+            }
+
+            private func createGameScene(size: CGSize) -> SKScene {
+                let scene = GameScene(size: size)
+                scene.scaleMode = .resizeFill
+                return scene
+            }
+        }
 
 #Preview {
     JoinGameView()

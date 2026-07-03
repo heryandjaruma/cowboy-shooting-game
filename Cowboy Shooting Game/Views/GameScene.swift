@@ -89,70 +89,70 @@ class GameScene: SKScene {
     }
     
     private func setupGun() {
-        let gun = SKSpriteNode(imageNamed: "Peacemaker_gun")
-        
-        gun.setScale(0.5)
-        
-        gun.position = CGPoint(x: 0, y: -40)
-        gun.zPosition = 1
-        gun.texture?.filteringMode = .nearest
-        
-        addChild(gun)
-    }
+            let gun = SKSpriteNode(imageNamed: "Peacemaker_gun")
+
+            gun.setScale(0.25)
+            
+            gun.position = CGPoint(x: 0, y: -40)
+            gun.zPosition = 1
+            gun.texture?.filteringMode = .nearest
+            
+            addChild(gun)
+        }
     
     private func setupPlayerUI() {
-        let panel = SKSpriteNode(imageNamed: "Button_long")
-        
-        panel.setScale(0.36)
-        panel.texture?.filteringMode = .nearest
-        
-        let xPos = -(self.size.width / 2) + (panel.size.width / 2) + 90
-        let yPos = (self.size.height / 2) - (panel.size.height / 2) - 130
-        panel.position = CGPoint(x: xPos, y: yPos)
-        panel.zPosition = 5
-        
-        let label = SKLabelNode(fontNamed: "YourCustomPixelFont-Regular")
-        label.text = "Player 1 / Round 1"
-        
-        label.fontSize = 40
-        label.fontColor = SKColor(red: 0.3, green: 0.15, blue: 0.1, alpha: 1.0)
-        label.verticalAlignmentMode = .center
-        label.zPosition = 6
-        
-        panel.addChild(label)
-        addChild(panel)
-    }
+            let panel = SKSpriteNode(imageNamed: "Button_long")
+            
+            panel.setScale(0.15)
+            panel.texture?.filteringMode = .nearest
+            
+            let xPos = -(self.size.width / 2) + (panel.size.width / 2) + 60
+            let yPos = (self.size.height / 2) - (panel.size.height / 2) - 30
+            panel.position = CGPoint(x: xPos, y: yPos)
+            panel.zPosition = 5
+            
+            let label = SKLabelNode(fontNamed: "YourCustomPixelFont-Regular")
+            label.text = "Player 1 / Round 1"
+            
+            label.fontSize = 80
+            label.fontColor = SKColor(red: 0.3, green: 0.15, blue: 0.1, alpha: 1.0)
+            label.verticalAlignmentMode = .center
+            label.zPosition = 6
+            
+            panel.addChild(label)
+            addChild(panel)
+        }
     
     private func setupHealthUI() {
-        let panel = SKSpriteNode(imageNamed: "Button")
-        
-        panel.setScale(0.36)
-        panel.texture?.filteringMode = .nearest
-        
-        let xPos = (self.size.width / 2) - (panel.size.width / 2) - 90
-        let yPos = (self.size.height / 2) - (panel.size.height / 2) - 130
-        panel.position = CGPoint(x: xPos, y: yPos)
-        panel.zPosition = 5
-        
-        let spacing: CGFloat = 180.0
-        let startX = -(spacing)
-        
-        for i in 0..<3 {
-            let heart = SKSpriteNode(imageNamed: "Life_full")
-            heart.texture?.filteringMode = .nearest
+            let panel = SKSpriteNode(imageNamed: "Button")
             
-            heart.setScale(0.09)
+            panel.setScale(0.15)
+            panel.texture?.filteringMode = .nearest
             
-            heart.position = CGPoint(x: startX + (CGFloat(i) * spacing), y: 0)
-            heart.zPosition = 6
+            let xPos = (self.size.width / 2) - (panel.size.width / 2) - 60
+            let yPos = (self.size.height / 2) - (panel.size.height / 2) - 30
+            panel.position = CGPoint(x: xPos, y: yPos)
+            panel.zPosition = 5
             
-            panel.addChild(heart)
+            let spacing: CGFloat = 160.0
+            let startX = -(spacing)
             
-            hearts.append(heart)
+            for i in 0..<3 {
+                let heart = SKSpriteNode(imageNamed: "Life_full")
+                heart.texture?.filteringMode = .nearest
+                
+                heart.setScale(0.08)
+                
+                heart.position = CGPoint(x: startX + (CGFloat(i) * spacing), y: 0)
+                heart.zPosition = 6
+                
+                panel.addChild(heart)
+                
+                hearts.append(heart)
+            }
+            
+            addChild(panel)
         }
-        
-        addChild(panel)
-    }
     
     // MARK: - New Interaction Node Setups
     
@@ -164,7 +164,7 @@ class GameScene: SKScene {
     }
     
     private func setupCountdownLabel() {
-        countdownLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold") // Default font for now
+        countdownLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold") //change it later
         countdownLabel.fontSize = 140
         countdownLabel.fontColor = .white
         countdownLabel.verticalAlignmentMode = .center
@@ -175,13 +175,15 @@ class GameScene: SKScene {
     }
     
     private func setupBangNode() {
-        bangNode = SKSpriteNode(imageNamed: "Bang")
-        bangNode.texture?.filteringMode = .nearest
-        
-        bangNode.position = CGPoint(x: 0, y: -20)
-        bangNode.zPosition = 12
-        bangNode.alpha = 0.0
-        
-        addChild(bangNode)
-    }
+            bangNode = SKSpriteNode(imageNamed: "Bang")
+            bangNode.texture?.filteringMode = .nearest
+            
+            bangNode.setScale(0.2)
+            
+            bangNode.position = CGPoint(x: 0, y: -20)
+            bangNode.zPosition = 12
+            bangNode.alpha = 0.0
+            
+            addChild(bangNode)
+        }
 }
