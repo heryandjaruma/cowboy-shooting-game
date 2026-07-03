@@ -19,8 +19,7 @@ struct ContentView: View {
     }
     
     var body: some View {
-        SpriteView(scene: gameScene)
-            .ignoresSafeArea()
+        MainMenuView()
     }
 }
 
