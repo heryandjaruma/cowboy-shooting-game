@@ -20,7 +20,7 @@ struct SettingsView: View {
 
             VStack(spacing: 24) {
                 VStack(spacing: 8) {
-                    Text("Use Slider to change the Volumi")
+                    Text("Use Slider to change the Volume")
                         .font(.headline)
                 }
 
