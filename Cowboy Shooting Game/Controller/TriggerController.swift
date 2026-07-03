@@ -46,7 +46,10 @@ final class TriggerController: ObservableObject {
         try? audioSession.setActive(true)
  
         startSilentPlayback()
-        setupHiddenTriggerView()
+        
+        DispatchQueue.main.async {
+            self.setupHiddenTriggerView()
+        }
  
         observation = audioSession.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
             guard let self = self else { return }
@@ -94,7 +97,6 @@ final class TriggerController: ObservableObject {
         triggerView.alpha = 0.001
         triggerView.isUserInteractionEnabled = false
         self.hiddenTriggerView = triggerView
- 
         guard let windowScene = UIApplication.shared.connectedScenes.first as? UIWindowScene,
               let window = windowScene.windows.first else {
             return
