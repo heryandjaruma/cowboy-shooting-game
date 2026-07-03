@@ -3,6 +3,19 @@ import GameplayKit
 
 class GameScene: SKScene {
     
+    // MARK: - Properties
+    
+    private var hearts: [SKSpriteNode] = []
+    private var currentLives = 3
+    
+    private var dimmingNode: SKSpriteNode!
+    private var countdownLabel: SKLabelNode!
+    private var bangNode: SKSpriteNode!
+    
+    private var isSequenceRunning = false
+    
+    // MARK: - Lifecycle
+    
     override func didMove(to view: SKView) {
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         
@@ -10,6 +23,58 @@ class GameScene: SKScene {
         setupGun()
         setupPlayerUI()
         setupHealthUI()
+        setupDimmingLayer()
+        setupCountdownLabel()
+        setupBangNode()
+    }
+    
+    // MARK: - Touch Handling
+    
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        guard !isSequenceRunning, currentLives > 0 else { return }
+        triggerFireSequence()
+    }
+    
+    // MARK: - Interaction Sequence
+    
+    private func triggerFireSequence() {
+        isSequenceRunning = true
+        
+        let dimIn = SKAction.fadeAlpha(to: 0.7, duration: 0.2)
+        dimmingNode.run(dimIn)
+        
+        let waitOneSec = SKAction.wait(forDuration: 1.0)
+        
+        let show3 = SKAction.run { self.countdownLabel.text = "3"; self.countdownLabel.alpha = 1.0 }
+        let show2 = SKAction.run { self.countdownLabel.text = "2" }
+        let show1 = SKAction.run { self.countdownLabel.text = "1" }
+        let showFire = SKAction.run { self.countdownLabel.text = "FIRE" } // Based on your screenshot reference
+        
+        let fireAction = SKAction.run {
+            self.countdownLabel.alpha = 0.0
+            self.dimmingNode.alpha = 0.0
+            self.bangNode.alpha = 1.0
+            self.currentLives -= 1
+            let targetHeart = self.hearts[self.currentLives]
+            targetHeart.texture = SKTexture(imageNamed: "lost_life")
+        }
+        
+        let hideBang = SKAction.run {
+            self.bangNode.alpha = 0.0
+            self.isSequenceRunning = false
+        }
+        
+        let sequence = SKAction.sequence([
+            show3, waitOneSec,
+            show2, waitOneSec,
+            show1, waitOneSec,
+            showFire, waitOneSec,
+            fireAction,
+            SKAction.wait(forDuration: 0.5),
+            hideBang
+        ])
+        
+        run(sequence)
     }
     
     // MARK: - Scene Setup Methods
@@ -73,7 +138,7 @@ class GameScene: SKScene {
         let startX = -(spacing)
         
         for i in 0..<3 {
-            let heart = SKSpriteNode(imageNamed: "Life_full") // Adjusted to match your previous screenshot exactly
+            let heart = SKSpriteNode(imageNamed: "Life_full")
             heart.texture?.filteringMode = .nearest
             
             heart.setScale(0.09)
@@ -82,9 +147,41 @@ class GameScene: SKScene {
             heart.zPosition = 6
             
             panel.addChild(heart)
+            
+            hearts.append(heart)
         }
         
         addChild(panel)
     }
+    
+    // MARK: - New Interaction Node Setups
+    
+    private func setupDimmingLayer() {
+        dimmingNode = SKSpriteNode(color: .black, size: self.size)
+        dimmingNode.alpha = 0.0
+        dimmingNode.zPosition = 10
+        addChild(dimmingNode)
+    }
+    
+    private func setupCountdownLabel() {
+        countdownLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold") // Default font for now
+        countdownLabel.fontSize = 140
+        countdownLabel.fontColor = .white
+        countdownLabel.verticalAlignmentMode = .center
+        countdownLabel.horizontalAlignmentMode = .center
+        countdownLabel.alpha = 0.0
+        countdownLabel.zPosition = 11
+        addChild(countdownLabel)
+    }
+    
+    private func setupBangNode() {
+        bangNode = SKSpriteNode(imageNamed: "Bang")
+        bangNode.texture?.filteringMode = .nearest
+        
+        bangNode.position = CGPoint(x: 0, y: -20)
+        bangNode.zPosition = 12
+        bangNode.alpha = 0.0
+        
+        addChild(bangNode)
+    }
 }
-
