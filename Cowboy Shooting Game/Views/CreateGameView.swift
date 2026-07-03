@@ -9,6 +9,7 @@
 import SwiftUI
 
 struct CreateGameView: View {
+    @ObservedObject var connection: GameConnectionManager
     @Environment(\.dismiss) private var dismiss
     @State private var isPulsing = false
 
@@ -39,9 +40,11 @@ struct CreateGameView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { connection.startHosting() }
+        .onDisappear { connection.stopAll() }
     }
 }
 
 #Preview {
-    CreateGameView()
+    CreateGameView(connection: GameConnectionManager())
 }

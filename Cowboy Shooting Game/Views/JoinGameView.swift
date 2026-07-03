@@ -91,8 +91,12 @@ struct CowboyScrollView<Content: View>: View {
 
 
 struct JoinGameView: View {
-    @StateObject private var controller = JoinGameController()
+    @StateObject private var controller: JoinGameController
     @Environment(\.dismiss) private var dismiss
+
+    init(connection: GameConnectionManager) {
+        _controller = StateObject(wrappedValue: JoinGameController(connection: connection))
+    }
 
     var body: some View {
         ZStack {
@@ -138,9 +142,11 @@ struct JoinGameView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { controller.start() }
+        .onDisappear { controller.stop() }
     }
 }
 
 #Preview {
-    JoinGameView()
+    JoinGameView(connection: GameConnectionManager())
 }
