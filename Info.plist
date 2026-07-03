@@ -2,18 +2,9 @@
 <!DOCTYPE plist PUBLIC "-//Apple//DTD PLIST 1.0//EN" "http://www.apple.com/DTDs/PropertyList-1.0.dtd">
 <plist version="1.0">
 <dict>
-	<!--
-	    Bonjour service type advertised by the host and searched for by joiners.
-	    Must exactly match GameConnectionManager.serviceType.
-	    The name between the underscores ("cowboyduel") must be <= 15 chars,
-	    lowercase letters/digits/hyphens only.
-	-->
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cowboyduel._tcp</string>
 	</array>
-	<!-- Shown in the iOS Local Network permission prompt. -->
-	<key>NSLocalNetworkUsageDescription</key>
-	<string>Cowboy Duel finds nearby players so you can face off in a one-on-one duel.</string>
 </dict>
 </plist>
