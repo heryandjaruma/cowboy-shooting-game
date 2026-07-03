@@ -35,7 +35,7 @@ struct MainMenuView: View {
                             } label: {
                                 Text(option.targetDestination.title)
                             }
-                            .buttonStyle(.cowboy)
+                            .buttonStyle(.cowboyCompact)
                         }
                     }
                     .padding(.top, 20)

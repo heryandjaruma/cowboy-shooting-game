@@ -11,7 +11,7 @@ import SwiftUI
 struct Cowboy_Shooting_GameApp: App {
     var body: some Scene {
         WindowGroup {
-            ContentView()
+            MainMenuView()
         }
     }
 }

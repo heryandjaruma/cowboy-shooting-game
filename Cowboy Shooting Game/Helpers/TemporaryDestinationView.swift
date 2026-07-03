@@ -7,34 +7,6 @@
 
 import SwiftUI
 
-struct CreateGameView: View {
-    var body: some View {
-        ZStack {
-            Image(.backgroundMainScreen)
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-            Text("Create Game")
-                .font(.titleCSG)
-        }
-        .navigationTitle("Create Game")
-    }
-}
-
-struct JoinGameView: View {
-    var body: some View {
-        ZStack {
-            Image(.backgroundMainScreen)
-                .resizable()
-                .scaledToFill()
-                .ignoresSafeArea()
-            Text("Join Game")
-                .font(.titleCSG)
-        }
-        .navigationTitle("Join Game")
-    }
-}
-
 struct HelpView: View {
     var body: some View {
         ZStack {
