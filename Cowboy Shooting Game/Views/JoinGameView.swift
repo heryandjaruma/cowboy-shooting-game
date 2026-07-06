@@ -6,7 +6,6 @@
 //
 
 import SwiftUI
-import SpriteKit
 
 //Scrollbar
 private struct ScrollOffsetKey: PreferenceKey {
@@ -92,11 +91,13 @@ struct CowboyScrollView<Content: View>: View {
 
 
 struct JoinGameView: View {
+    @ObservedObject private var connection: GameConnectionManager
     @StateObject private var controller: JoinGameController
     @Environment(\.dismiss) private var dismiss
-    @State private var navigateToGame = false
+    @State private var navigateToConfirmation = false
 
     init(connection: GameConnectionManager) {
+        _connection = ObservedObject(wrappedValue: connection)
         _controller = StateObject(wrappedValue: JoinGameController(connection: connection))
     }
 
@@ -109,6 +110,7 @@ struct JoinGameView: View {
 
             VStack(spacing: 20) {
                 ScreenTopBar(title: "Join Game") {
+                    controller.stop() // leaving the list — tear down here, not on disappear.
                     dismiss()
                 }
 
@@ -121,7 +123,6 @@ struct JoinGameView: View {
                             ForEach(controller.rooms) { room in
                                 Button {
                                     controller.join(room: room)
-                                    navigateToGame = true
                                 } label: {
                                     Text(room.displayName)
                                         .frame(maxWidth:.infinity, alignment: .center)
@@ -146,21 +147,22 @@ struct JoinGameView: View {
         }
                 .toolbar(.hidden, for: .navigationBar)
         .onAppear { controller.start() }
-        .onDisappear { controller.stop() }
-                .fullScreenCover(isPresented: $navigateToGame) {
-                    GeometryReader { geometry in
-                        SpriteView(scene: createGameScene(size: geometry.size))
-                            .ignoresSafeArea()
-                    }
-                }
-            }
-
-            private func createGameScene(size: CGSize) -> SKScene {
-                let scene = GameScene(size: size)
-                scene.scaleMode = .resizeFill
-                return scene
+        .onChange(of: connection.state) { _, newState in
+            // Joined a room — both players meet on the confirmation screen.
+            if case .connected = newState {
+                navigateToConfirmation = true
             }
         }
+        .fullScreenCover(isPresented: $navigateToConfirmation, onDismiss: {
+            // Back from the pre-duel screen without a match — browse again.
+            if case .connected = connection.state {} else {
+                controller.start()
+            }
+        }) {
+            ConfirmationScreenView(connection: connection)
+        }
+    }
+}
 
 #Preview {
     JoinGameView(connection: GameConnectionManager())
