@@ -19,7 +19,10 @@ class GameScene: SKScene {
 
     private var dimmingNode: SKSpriteNode!
     private var countdownLabel: SKLabelNode!
-    private var bangNode: SKSpriteNode!
+    private var countdownNode: SKSpriteNode!  // num3 / num2 images
+    private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
+    private var resultNode: SKSpriteNode!      // "win" / "lose" result image
+    private var bangNode: SKSpriteNode!        // shot-effect image
 
     private var localSceneReady = false
     private var remoteSceneReady = false
@@ -53,6 +56,9 @@ class GameScene: SKScene {
         setupHealthUI()
         setupDimmingLayer()
         setupCountdownLabel()
+        setupCountdownNode()
+        setupFireNode()
+        setupResultNode()
         setupBangNode()
 
         prepareHaptics()
@@ -63,7 +69,8 @@ class GameScene: SKScene {
     }
 
     // MARK: - Controller Observation
-
+    // GameKit cannot directly use the @Publishable,
+    // so instead it needs to subscribe to the changes.
     private func observeControllers() {
         countdownController.$phase
             .sink { [weak self] phase in
@@ -90,40 +97,88 @@ class GameScene: SKScene {
         switch phase {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
+            countdownLabel.removeAllActions()
             countdownLabel.text = "Waiting..."
+            countdownLabel.fontSize = 80
             countdownLabel.fontColor = .white
+            countdownLabel.setScale(1.0)
             countdownLabel.alpha = 1.0
+            countdownNode.removeAllActions(); countdownNode.alpha = 0.0
+            fireNode.removeAllActions();     fireNode.alpha = 0.0
+            resultNode.removeAllActions();   resultNode.alpha = 0.0
 
         case .waiting:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
+            countdownLabel.removeAllActions()
             countdownLabel.text = "Step right up."
+            countdownLabel.fontSize = 80
             countdownLabel.fontColor = .white
+            countdownLabel.setScale(1.0)
             countdownLabel.alpha = 1.0
+            countdownNode.removeAllActions(); countdownNode.alpha = 0.0
+            fireNode.removeAllActions();     fireNode.alpha = 0.0
+            resultNode.removeAllActions();   resultNode.alpha = 0.0
 
         case .counting(let n):
-            countdownLabel.text = "\(n)"
-            countdownLabel.fontColor = .orange
-            countdownLabel.alpha = 1.0
             dimmingNode.alpha = 0.7
+            fireNode.removeAllActions();   fireNode.alpha = 0.0
+            resultNode.removeAllActions(); resultNode.alpha = 0.0
+
+            guard n == 3 || n == 2 else {
+                // No asset for 1 — blank pause before fire
+                countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
+                countdownNode.removeAllActions();  countdownNode.alpha = 0.0
+                break
+            }
+            countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
+            let numTex = SKTexture(imageNamed: n == 3 ? "num3" : "num2")
+            numTex.filteringMode = .nearest
+            countdownNode.texture = numTex
+            countdownNode.size = numTex.size()   // must set size when texture is assigned after init
+            countdownNode.removeAllActions()
+            countdownNode.setScale(0.2)
+            countdownNode.alpha = 1.0
+            countdownNode.run(SKAction.sequence([
+                SKAction.scale(to: 1.1, duration: 0.12),
+                SKAction.scale(to: 1.0, duration: 0.08)
+            ]))
 
         case .fire:
-            countdownLabel.text = "FIRE!"
-            countdownLabel.fontColor = .red
-            countdownLabel.alpha = 1.0
-            countdownLabel.run(SKAction.sequence([
-                SKAction.wait(forDuration: 0.3),
-                SKAction.fadeOut(withDuration: 0.3)
-            ]))
-            dimmingNode.run(SKAction.fadeOut(withDuration: 0.3))
+            // Lift the dimming overlay and hide number nodes
+            countdownLabel.removeAllActions(); countdownLabel.run(SKAction.fadeOut(withDuration: 0.15))
+            countdownNode.removeAllActions();  countdownNode.run(SKAction.fadeOut(withDuration: 0.15))
+            resultNode.removeAllActions();     resultNode.alpha = 0.0
+            dimmingNode.run(SKAction.fadeOut(withDuration: 0.25))
+            // Show fire image with a looping pulse
+            fireNode.removeAllActions()
+            fireNode.setScale(0.2)
+            fireNode.alpha = 1.0
+            let grow = SKAction.scale(to: 1.05, duration: 0.18)
+            let pulse = SKAction.sequence([
+                SKAction.scale(to: 0.95, duration: 0.35),
+                SKAction.scale(to: 1.05, duration: 0.35)
+            ])
+            fireNode.run(SKAction.sequence([grow, SKAction.repeatForever(pulse)]))
         }
     }
 
     private func handleOutcome(_ outcome: ShotController.Outcome) {
-        countdownLabel.removeAllActions()
-        countdownLabel.text = outcome == .winner ? "YOU WIN!" : "YOU LOSE"
-        countdownLabel.fontColor = outcome == .winner ? .green : .red
-        countdownLabel.alpha = 1.0
+        // Stop any in-progress animations
+        fireNode.removeAllActions();   fireNode.run(SKAction.fadeOut(withDuration: 0.15))
+        countdownNode.removeAllActions(); countdownNode.alpha = 0.0
+        countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
         dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
+        resultNode.removeAllActions()
+        let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose") // choose which to show
+        resultTex.filteringMode = .nearest
+        resultNode.texture = resultTex
+        resultNode.size = resultTex.size()
+        resultNode.setScale(0.2)
+        resultNode.alpha = 1.0
+        resultNode.run(SKAction.sequence([
+            SKAction.scale(to: 1.1, duration: 0.15),
+            SKAction.scale(to: 1.0, duration: 0.10)
+        ]))
 
         if outcome == .loser {
             currentLives = max(0, currentLives - 1)
@@ -295,14 +350,36 @@ class GameScene: SKScene {
     private func setupBangNode() {
         bangNode = SKSpriteNode(imageNamed: "Bang")
         bangNode.texture?.filteringMode = .nearest
-        
         bangNode.setScale(0.2)
-        
         bangNode.position = CGPoint(x: 0, y: -20)
         bangNode.zPosition = 12
         bangNode.alpha = 0.0
-        
         addChild(bangNode)
+    }
+
+    private func setupCountdownNode() {
+        countdownNode = SKSpriteNode()
+        countdownNode.position = CGPoint(x: 0, y: 0)
+        countdownNode.zPosition = 11
+        countdownNode.alpha = 0.0
+        addChild(countdownNode)
+    }
+
+    private func setupFireNode() {
+        fireNode = SKSpriteNode(imageNamed: "fire")
+        fireNode.texture?.filteringMode = .nearest
+        fireNode.position = CGPoint(x: 0, y: 0)
+        fireNode.zPosition = 11
+        fireNode.alpha = 0.0
+        addChild(fireNode)
+    }
+
+    private func setupResultNode() {
+        resultNode = SKSpriteNode()
+        resultNode.position = CGPoint(x: 0, y: 0)
+        resultNode.zPosition = 13
+        resultNode.alpha = 0.0
+        addChild(resultNode)
     }
     
     // MARK: - Hardware Integration (Audio, Flashlight, Haptics)
@@ -311,10 +388,19 @@ class GameScene: SKScene {
         playGunshotAudio()
         playGunshotHaptic()
         fireMuzzleFlash()
+        // Stop the fire draw-prompt
+        fireNode.removeAllActions()
+        fireNode.run(SKAction.fadeOut(withDuration: 0.1))
+        // Burst the bang shot-effect node
+        bangNode.removeAllActions()
         bangNode.alpha = 1.0
         bangNode.run(SKAction.sequence([
-            SKAction.wait(forDuration: 0.5),
-            SKAction.fadeOut(withDuration: 0.2)
+            SKAction.scale(to: 0.35, duration: 0.08),
+            SKAction.wait(forDuration: 0.3),
+            SKAction.group([
+                SKAction.scale(to: 0.2, duration: 0.25),
+                SKAction.fadeOut(withDuration: 0.25)
+            ])
         ]))
     }
     
