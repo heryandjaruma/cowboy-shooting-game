@@ -27,7 +27,7 @@ final class CountdownController: ObservableObject {
     enum Phase: Equatable {
         case notReady        // connected; waiting for this player to tap Ready
         case waiting         // this player is ready ("Step right up.")
-        case counting(Int)   // 3, 2, 1
+        case counting(Int)   // 3, 2
         case fire            // firing window open — draw!
     }
 
