@@ -8,30 +8,34 @@
 import Foundation
 import Combine
 
+@MainActor
 final class JoinGameController: ObservableObject {
     @Published private(set) var rooms: [GameRoom] = []
 
-    init() {
-        loadDummyRooms()
+    private let connection: GameConnectionManager
+    private var cancellable: AnyCancellable?
+
+    init(connection: GameConnectionManager) {
+        self.connection = connection
     }
 
-    func loadDummyRooms() {
-        rooms = [
-            GameRoom(hostName: "Rayne"),
-            GameRoom(hostName: "Max"),
-            GameRoom(hostName: "Ryan"),
-            GameRoom(hostName: "Ian"),
-            GameRoom(hostName: "Nisa"),
-            GameRoom(hostName: "Test"),
-            GameRoom(hostName: "Test"),
-            GameRoom(hostName: "Test"),
-            GameRoom(hostName: "Test"),
-            GameRoom(hostName: "Test"),
-            GameRoom(hostName: "Test")
-        ]
+    func start() {
+        connection.startBrowsing()
+        cancellable = connection.$discoveredPeers.sink { [weak self] peers in
+            Task { @MainActor in
+                self?.rooms = peers.map {
+                    GameRoom(id: $0.id, hostName: $0.name, endpoint: $0.endpoint)
+                }
+            }
+        }
     }
 
     func join(room: GameRoom) {
-        // TODO: networking
+        connection.join(.init(id: room.id, name: room.hostName, endpoint: room.endpoint))
+    }
+
+    func stop() {
+        cancellable = nil
+        connection.stopAll()
     }
 }

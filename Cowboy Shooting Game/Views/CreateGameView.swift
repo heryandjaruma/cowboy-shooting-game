@@ -7,10 +7,13 @@
 
 
 import SwiftUI
+import SpriteKit
 
 struct CreateGameView: View {
+    @ObservedObject var connection: GameConnectionManager
     @Environment(\.dismiss) private var dismiss
     @State private var isPulsing = false
+    @State private var navigateToGame = false
 
     var body: some View {
         ZStack {
@@ -39,9 +42,29 @@ struct CreateGameView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onAppear { connection.startHosting() }
+        .onDisappear { connection.stopAll() }
+        .onChange(of: connection.state) { _, newState in
+                    // A challenger joined — move the host into the game too.
+                    if case .connected = newState {
+                        navigateToGame = true
+                    }
+                }
+                .fullScreenCover(isPresented: $navigateToGame) {
+                    GeometryReader { geometry in
+                        SpriteView(scene: createGameScene(size: geometry.size))
+                            .ignoresSafeArea()
+                    }
+                }
     }
+    
+    private func createGameScene(size: CGSize) -> SKScene {
+            let scene = GameScene(size: size)
+            scene.scaleMode = .resizeFill
+            return scene
+        }
 }
 
 #Preview {
-    CreateGameView()
+    CreateGameView(connection: GameConnectionManager())
 }

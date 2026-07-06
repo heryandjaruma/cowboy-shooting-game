@@ -8,6 +8,7 @@
 import SwiftUI
 
 struct MainMenuView: View {
+    @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
     private let menuOptions: [MenuOption] = [
@@ -68,9 +69,9 @@ struct MainMenuView: View {
             .navigationDestination(for: MenuDestination.self) { destination in
                 switch destination {
                 case .createGame:
-                    CreateGameView()
+                    CreateGameView(connection: connection)
                 case .joinGame:
-                    JoinGameView()
+                    JoinGameView(connection: connection)
                 case .helpGame:
                     HelpView()
                 case .settingsGame:
