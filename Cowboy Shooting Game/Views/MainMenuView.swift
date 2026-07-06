@@ -25,16 +25,16 @@ struct MainMenuView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 16) {
-                    Text("COWBOY\nSHOOTERS")
-                        .font(.titleCSG)
-                        .multilineTextAlignment(.center)
+                    TitleView()
+                        .padding(.top, 20)
 
-                    VStack(spacing: 14) {
+                    VStack(spacing: 9) {
                         ForEach(menuOptions) { option in
                             Button {
                                 path.append(option.targetDestination)
                             } label: {
                                 Text(option.targetDestination.title)
+                                    .font(.headingCSG)
                             }
                             .buttonStyle(.cowboyCompact)
                         }
@@ -79,17 +79,6 @@ struct MainMenuView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-        }
-        // Trigger button di-aktifkan sekali di root, tetap hidup selama app jalan
-        .onHardwareTrigger { direction in
-            switch direction {
-            case .up:
-                // TODO: aksi trigger up (misal: shoot)
-                break
-            case .down:
-                // TODO: aksi trigger down
-                break
-            }
         }
     }
 }

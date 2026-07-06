@@ -10,9 +10,9 @@ import SwiftUI
 // MARK: - FONT
 
 extension Font {
-    static var titleCSG: Font { .custom("Wild_west_pixel", size: 36)}
-    static var headingCSG: Font { .custom("OSD_mono", size: 24)}
-    static var headingCSG2: Font { .custom("OSD_mono", size: 18)}
+    static var titleCSG: Font { .custom("WildWestPixel", size: 36)}
+    static var headingCSG: Font { .custom("VCROSDMono", size: 24)}
+    static var headingCSG2: Font { .custom("VCROSDMono", size: 18)}
 }
 
 
@@ -23,3 +23,46 @@ extension Color {
     static let ternaryCSG = Color(red: 93/255, green: 50/255, blue: 43/255)
 }
 
+struct TitleView : View {
+    var body: some View {
+        ZStack {
+            Text("COWBOY SHOOTERS\nBANG BANG")
+                .font(.titleCSG)
+                .foregroundStyle(Color(.black))
+                .multilineTextAlignment(.center)
+                .offset(x:3,y:3)
+            Text("COWBOY SHOOTERS\nBANG BANG")
+                .font(.titleCSG)
+                .foregroundStyle(Color(.black))
+                .multilineTextAlignment(.center)
+                .offset(x:-3,y:-3)
+            Text("COWBOY SHOOTERS\nBANG BANG")
+                .font(.titleCSG)
+                .foregroundStyle(Color(.black))
+                .multilineTextAlignment(.center)
+                .offset(x:-3,y:3)
+            Text("COWBOY SHOOTERS\nBANG BANG")
+                .font(.titleCSG)
+                .foregroundStyle(Color(.black))
+                .multilineTextAlignment(.center)
+                .offset(x:3,y:-3)
+        }.overlay(
+            Text("COWBOY SHOOTERS\nBANG BANG")
+            .font(.titleCSG)
+            .foregroundStyle(Color(.white))
+            .multilineTextAlignment(.center))
+    }
+}
+
+struct TypographyPreview : View {
+    var body: some View {
+        Text("Hello, World!")
+            .font(.titleCSG)
+        Text("Hello, World!")
+            .font(.headingCSG)
+    }
+}
+
+#Preview {
+    TitleView()
+}

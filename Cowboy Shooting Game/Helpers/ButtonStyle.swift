@@ -44,20 +44,32 @@ struct CowboyIconButtonStyle: ButtonStyle {
             .foregroundColor(Color.ternaryCSG)
             .frame(width: 44, height: 44)
             .background(
-                Circle()
-                    .fill(Color.secondaryCSG)
-            )
-            .overlay(
-                Circle()
-                    .stroke(Color.ternaryCSG, lineWidth: 3)
+                Image(.buttonRound)
+                    .resizable()
+                    .scaledToFit()
             )
             .scaleEffect(configuration.isPressed ? 0.9 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
- 
+
 extension ButtonStyle where Self == CowboyIconButtonStyle {
     static var cowboyIcon: CowboyIconButtonStyle { CowboyIconButtonStyle() }
 }
  
+struct ButtonPreview : View {
+    var body : some View {
+        Button{
+            //empty
+        }label: {
+            Text("Hello")
+                .font(.headingCSG)
+        }
+        .buttonStyle(.cowboy)
+    }
+}
+
+#Preview {
+    ButtonPreview()
+}
