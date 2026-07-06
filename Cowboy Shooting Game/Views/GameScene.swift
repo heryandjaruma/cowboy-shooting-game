@@ -1,12 +1,25 @@
+import SwiftUI
 import SpriteKit
 import GameplayKit
 import AVFoundation
 import CoreHaptics
 import UIKit // Required for NSDataAsset
 
+enum GameplayState {
+    case waitingForPlayers
+    case introCountdown
+    case readyToFire
+    case fireSequence
+    case gameOver
+}
+
 class GameScene: SKScene {
     
     // MARK: - Properties
+    
+    var connection: GameConnectionManager?
+    var shotController: ShotController = ShotController()
+    var countdownController: CountdownController = CountdownController()
     
     private var hearts: [SKSpriteNode] = []
     private var currentLives = 3
@@ -15,9 +28,9 @@ class GameScene: SKScene {
     private var countdownLabel: SKLabelNode!
     private var bangNode: SKSpriteNode!
     
-    private var isSequenceRunning = false
-
-    var connection: GameConnectionManager?
+//    private var isCountdownSequenceRunning = false
+    private var gameplayState: GameplayState = .waitingForPlayers
+    
     private var localSceneReady = false
     private var remoteSceneReady = false
     private var didAnnounceDuel = false
@@ -35,6 +48,12 @@ class GameScene: SKScene {
     // MARK: - Lifecycle
     
     override func didMove(to view: SKView) {
+        // setup controllers
+        if let connection {
+            shotController.configure(connection: connection)
+            countdownController.configure(connection: connection, shot: shotController)
+        }
+        
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
         
         setupBackground()
@@ -51,11 +70,15 @@ class GameScene: SKScene {
 
         // Carrying connection here
         setupNetworking()
+        
+        // then immidiatelly run countdown sequence to play game
+        triggerCountdownSequence()
     }
 
     // MARK: - Networking (scene-ready handshake)
 
     private func setupNetworking() {
+        gameplayState = .waitingForPlayers
         guard let connection else {
             print("⚠️ GameScene has no connection — running solo.")
             return
@@ -101,25 +124,27 @@ class GameScene: SKScene {
             opponent = "opponent"
         }
         print("[\(role)] \(connection.myName) joined \(opponent) joined.")
+        triggerCountdownSequence()
     }
     
     // MARK: - Touch Handling
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        // 1. Trigger the immediate shoot effects on screen touch
-        playGunshotAudio()
-        playGunshotHaptic()
-        fireMuzzleFlash()
+//         2. Trigger the sequence (only if it isn't already running and player has lives)
         
-        // 2. Trigger the sequence (only if it isn't already running and player has lives)
-        guard !isSequenceRunning, currentLives > 0 else { return }
-        triggerFireSequence()
+        // guard only when sequence is not running
+        guard gameplayState == .readyToFire, (currentLives != 0) else { return }
+    
+        // allow bang when it's time
+        // 1. Trigger the immediate shoot effects on screen touch
+        bang()
     }
     
     // MARK: - Interaction Sequence
     
-    private func triggerFireSequence() {
-        isSequenceRunning = true
+    private func triggerCountdownSequence() {
+        // immediatelly start countdown entring this scene
+        gameplayState = .introCountdown
         
         let dimIn = SKAction.fadeAlpha(to: 0.7, duration: 0.2)
         dimmingNode.run(dimIn)
@@ -146,7 +171,7 @@ class GameScene: SKScene {
         
         let hideBang = SKAction.run {
             self.bangNode.alpha = 0.0
-            self.isSequenceRunning = false
+//            self.isCountdownSequenceRunning = false
         }
         
         let sequence = SKAction.sequence([
@@ -271,6 +296,12 @@ class GameScene: SKScene {
     }
     
     // MARK: - Hardware Integration (Audio, Flashlight, Haptics)
+    
+    private func bang() {
+        playGunshotAudio()
+        playGunshotHaptic()
+        fireMuzzleFlash()
+    }
     
     private func setupAudioSession() {
         do {
