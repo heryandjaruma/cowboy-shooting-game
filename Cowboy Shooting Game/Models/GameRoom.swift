@@ -6,10 +6,12 @@
 //
 
 import Foundation
+import Network
 
 struct GameRoom: Identifiable, Hashable {
-    let id = UUID()
+    let id: String
     let hostName: String
+    let endpoint: NWEndpoint // Changed from UID cause we use NWEndpoint
 
     var displayName: String {
         "\(hostName)'s Game"

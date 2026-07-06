@@ -92,9 +92,13 @@ struct CowboyScrollView<Content: View>: View {
 
 
 struct JoinGameView: View {
-    @StateObject private var controller = JoinGameController()
+    @StateObject private var controller: JoinGameController
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToGame = false
+
+    init(connection: GameConnectionManager) {
+        _controller = StateObject(wrappedValue: JoinGameController(connection: connection))
+    }
 
     var body: some View {
         ZStack {
@@ -141,6 +145,8 @@ struct JoinGameView: View {
             }
         }
                 .toolbar(.hidden, for: .navigationBar)
+        .onAppear { controller.start() }
+        .onDisappear { controller.stop() }
                 .fullScreenCover(isPresented: $navigateToGame) {
                     GeometryReader { geometry in
                         SpriteView(scene: createGameScene(size: geometry.size))
@@ -157,5 +163,5 @@ struct JoinGameView: View {
         }
 
 #Preview {
-    JoinGameView()
+    JoinGameView(connection: GameConnectionManager())
 }
