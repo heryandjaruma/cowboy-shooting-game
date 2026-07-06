@@ -4,36 +4,28 @@ import GameplayKit
 import AVFoundation
 import CoreHaptics
 import UIKit // Required for NSDataAsset
-
-enum GameplayState {
-    case waitingForPlayers
-    case introCountdown
-    case readyToFire
-    case fireSequence
-    case gameOver
-}
+import Combine
 
 class GameScene: SKScene {
-    
+
     // MARK: - Properties
-    
+
     var connection: GameConnectionManager?
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
-    
+
     private var hearts: [SKSpriteNode] = []
     private var currentLives = 3
-    
+
     private var dimmingNode: SKSpriteNode!
     private var countdownLabel: SKLabelNode!
     private var bangNode: SKSpriteNode!
-    
-//    private var isCountdownSequenceRunning = false
-    private var gameplayState: GameplayState = .waitingForPlayers
-    
+
     private var localSceneReady = false
     private var remoteSceneReady = false
     private var didAnnounceDuel = false
+
+    private var cancellables = Set<AnyCancellable>()
 
     private enum SceneOp {
         static let ready: UInt8 = 0     // "I reached the GameScene"
@@ -44,18 +36,17 @@ class GameScene: SKScene {
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
-    
+
     // MARK: - Lifecycle
-    
+
     override func didMove(to view: SKView) {
-        // setup controllers
         if let connection {
             shotController.configure(connection: connection)
             countdownController.configure(connection: connection, shot: shotController)
         }
-        
+
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-        
+
         setupBackground()
         setupGun()
         setupPlayerUI()
@@ -63,22 +54,89 @@ class GameScene: SKScene {
         setupDimmingLayer()
         setupCountdownLabel()
         setupBangNode()
-        
-        // Boot up hardware features
+
         prepareHaptics()
         setupAudioSession()
 
-        // Carrying connection here
+        observeControllers()
         setupNetworking()
-        
-        // then immidiatelly run countdown sequence to play game
-        triggerCountdownSequence()
+    }
+
+    // MARK: - Controller Observation
+
+    private func observeControllers() {
+        countdownController.$phase
+            .sink { [weak self] phase in
+                self?.handlePhaseChange(phase)
+            }
+            .store(in: &cancellables)
+
+        shotController.$didFire
+            .sink { [weak self] didFire in
+                guard didFire else { return }
+                self?.bang()
+            }
+            .store(in: &cancellables)
+
+        shotController.$outcome
+            .sink { [weak self] outcome in
+                guard let outcome else { return }
+                self?.handleOutcome(outcome)
+            }
+            .store(in: &cancellables)
+    }
+
+    private func handlePhaseChange(_ phase: CountdownController.Phase) {
+        switch phase {
+        case .notReady:
+            dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
+            countdownLabel.text = "Waiting..."
+            countdownLabel.fontColor = .white
+            countdownLabel.alpha = 1.0
+
+        case .waiting:
+            dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
+            countdownLabel.text = "Step right up."
+            countdownLabel.fontColor = .white
+            countdownLabel.alpha = 1.0
+
+        case .counting(let n):
+            countdownLabel.text = "\(n)"
+            countdownLabel.fontColor = .orange
+            countdownLabel.alpha = 1.0
+            dimmingNode.alpha = 0.7
+
+        case .fire:
+            countdownLabel.text = "FIRE!"
+            countdownLabel.fontColor = .red
+            countdownLabel.alpha = 1.0
+            countdownLabel.run(SKAction.sequence([
+                SKAction.wait(forDuration: 0.3),
+                SKAction.fadeOut(withDuration: 0.3)
+            ]))
+            dimmingNode.run(SKAction.fadeOut(withDuration: 0.3))
+        }
+    }
+
+    private func handleOutcome(_ outcome: ShotController.Outcome) {
+        countdownLabel.removeAllActions()
+        countdownLabel.text = outcome == .winner ? "YOU WIN!" : "YOU LOSE"
+        countdownLabel.fontColor = outcome == .winner ? .green : .red
+        countdownLabel.alpha = 1.0
+        dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
+
+        if outcome == .loser {
+            currentLives = max(0, currentLives - 1)
+            if currentLives < hearts.count {
+                hearts[currentLives].texture = SKTexture(imageNamed: "lost_life")
+            }
+            playGetHitHaptic()
+        }
     }
 
     // MARK: - Networking (scene-ready handshake)
 
     private func setupNetworking() {
-        gameplayState = .waitingForPlayers
         guard let connection else {
             print("⚠️ GameScene has no connection — running solo.")
             return
@@ -123,68 +181,19 @@ class GameScene: SKScene {
         } else {
             opponent = "opponent"
         }
-        print("[\(role)] \(connection.myName) joined \(opponent) joined.")
-        triggerCountdownSequence()
+        print("[\(role)] \(connection.myName) and \(opponent) both reached the scene.")
+
+        // Entering the game scene implies readiness — kick off the countdown.
+        countdownController.pressReady()
     }
-    
+
     // MARK: - Touch Handling
-    
+
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-//         2. Trigger the sequence (only if it isn't already running and player has lives)
-        
-        // guard only when sequence is not running
-        guard gameplayState == .readyToFire, (currentLives != 0) else { return }
-    
-        // allow bang when it's time
-        // 1. Trigger the immediate shoot effects on screen touch
-        bang()
-    }
-    
-    // MARK: - Interaction Sequence
-    
-    private func triggerCountdownSequence() {
-        // immediatelly start countdown entring this scene
-        gameplayState = .introCountdown
-        
-        let dimIn = SKAction.fadeAlpha(to: 0.7, duration: 0.2)
-        dimmingNode.run(dimIn)
-        
-        let waitOneSec = SKAction.wait(forDuration: 1.0)
-        
-        let show3 = SKAction.run { self.countdownLabel.text = "3"; self.countdownLabel.alpha = 1.0 }
-        let show2 = SKAction.run { self.countdownLabel.text = "2" }
-        let show1 = SKAction.run { self.countdownLabel.text = "1" }
-        let showFire = SKAction.run { self.countdownLabel.text = "FIRE" }
-        
-        let fireAction = SKAction.run {
-            self.countdownLabel.alpha = 0.0
-            self.dimmingNode.alpha = 0.0
-            self.bangNode.alpha = 1.0
-            
-            self.currentLives -= 1
-            let targetHeart = self.hearts[self.currentLives]
-            targetHeart.texture = SKTexture(imageNamed: "lost_life")
-            
-            // Trigger the "Get Hit" haptic when the life is lost
-            self.playGetHitHaptic()
-        }
-        
-        let hideBang = SKAction.run {
-            self.bangNode.alpha = 0.0
-//            self.isCountdownSequenceRunning = false
-        }
-        
-        let sequence = SKAction.sequence([
-            show3, waitOneSec,
-            show2, waitOneSec,
-            show1, waitOneSec,
-            showFire, waitOneSec,
-            fireAction,
-            SKAction.wait(forDuration: 0.5),
-            hideBang
-        ])
-        
-        run(sequence)
+        guard case .fire = countdownController.phase,
+              !shotController.didFire,
+              shotController.outcome == nil else { return }
+        shotController.fire()
     }
     
     // MARK: - Scene Setup Methods
@@ -266,18 +275,19 @@ class GameScene: SKScene {
     
     private func setupDimmingLayer() {
         dimmingNode = SKSpriteNode(color: .black, size: self.size)
-        dimmingNode.alpha = 0.0
+        dimmingNode.alpha = 0.7
         dimmingNode.zPosition = 10
         addChild(dimmingNode)
     }
-    
+
     private func setupCountdownLabel() {
         countdownLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
         countdownLabel.fontSize = 140
         countdownLabel.fontColor = .white
         countdownLabel.verticalAlignmentMode = .center
         countdownLabel.horizontalAlignmentMode = .center
-        countdownLabel.alpha = 0.0
+        countdownLabel.text = "Waiting..."
+        countdownLabel.alpha = 1.0
         countdownLabel.zPosition = 11
         addChild(countdownLabel)
     }
@@ -301,6 +311,11 @@ class GameScene: SKScene {
         playGunshotAudio()
         playGunshotHaptic()
         fireMuzzleFlash()
+        bangNode.alpha = 1.0
+        bangNode.run(SKAction.sequence([
+            SKAction.wait(forDuration: 0.5),
+            SKAction.fadeOut(withDuration: 0.2)
+        ]))
     }
     
     private func setupAudioSession() {
