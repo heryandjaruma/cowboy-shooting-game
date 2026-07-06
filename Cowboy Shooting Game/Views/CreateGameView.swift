@@ -7,13 +7,12 @@
 
 
 import SwiftUI
-import SpriteKit
 
 struct CreateGameView: View {
     @ObservedObject var connection: GameConnectionManager
     @Environment(\.dismiss) private var dismiss
     @State private var isPulsing = false
-    @State private var navigateToGame = false
+    @State private var navigateToConfirmation = false
 
     var body: some View {
         ZStack {
@@ -24,6 +23,7 @@ struct CreateGameView: View {
 
             VStack {
                 ScreenTopBar(title: "Create Game") {
+                    connection.stopAll() // leaving the room — tear down here, not on disappear.
                     dismiss()
                 }
 
@@ -43,26 +43,21 @@ struct CreateGameView: View {
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { connection.startHosting() }
-        .onDisappear { connection.stopAll() }
         .onChange(of: connection.state) { _, newState in
-                    // A challenger joined — move the host into the game too.
-                    if case .connected = newState {
-                        navigateToGame = true
-                    }
-                }
-                .fullScreenCover(isPresented: $navigateToGame) {
-                    GeometryReader { geometry in
-                        SpriteView(scene: createGameScene(size: geometry.size))
-                            .ignoresSafeArea()
-                    }
-                }
-    }
-    
-    private func createGameScene(size: CGSize) -> SKScene {
-            let scene = GameScene(size: size)
-            scene.scaleMode = .resizeFill
-            return scene
+            // A challenger joined — both players meet on the confirmation screen.
+            if case .connected = newState {
+                navigateToConfirmation = true
+            }
         }
+        .fullScreenCover(isPresented: $navigateToConfirmation, onDismiss: {
+            // Back from the pre-duel screen without a match — host again.
+            if case .connected = connection.state {} else {
+                connection.startHosting()
+            }
+        }) {
+            ConfirmationScreenView(connection: connection)
+        }
+    }
 }
 
 #Preview {

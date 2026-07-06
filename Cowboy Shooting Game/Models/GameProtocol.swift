@@ -130,6 +130,7 @@ nonisolated enum GameChannel: UInt8 {
     case match = 1   // ready / countdown coordination (CountdownController)
     case shot = 2    // draw / verdict (ShotController)
     case clock = 3   // clock-offset estimation (GameConnectionManager)
+    case scene = 4   // "both players reached the GameScene" handshake (GameScene)
 }
 
 /// Little-endian encoding for the scalar values we ship inside game events.

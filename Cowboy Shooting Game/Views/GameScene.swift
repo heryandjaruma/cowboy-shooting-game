@@ -16,7 +16,17 @@ class GameScene: SKScene {
     private var bangNode: SKSpriteNode!
     
     private var isSequenceRunning = false
-    
+
+    var connection: GameConnectionManager?
+    private var localSceneReady = false
+    private var remoteSceneReady = false
+    private var didAnnounceDuel = false
+
+    private enum SceneOp {
+        static let ready: UInt8 = 0     // "I reached the GameScene"
+        static let readyAck: UInt8 = 1  // "…and I heard that you did too"
+    }
+
     // Hardware integration properties
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
@@ -38,6 +48,59 @@ class GameScene: SKScene {
         // Boot up hardware features
         prepareHaptics()
         setupAudioSession()
+
+        // Carrying connection here
+        setupNetworking()
+    }
+
+    // MARK: - Networking (scene-ready handshake)
+
+    private func setupNetworking() {
+        guard let connection else {
+            print("⚠️ GameScene has no connection — running solo.")
+            return
+        }
+
+        // Register before announcing so we can't miss the peer's reply.
+        connection.onEvent(channel: GameChannel.scene.rawValue) { [weak self] body in
+            self?.handleSceneEvent(body)
+        }
+
+        localSceneReady = true
+        connection.sendEvent(channel: GameChannel.scene.rawValue, body: Data([SceneOp.ready]))
+        announceIfBothReady()
+    }
+
+    private func handleSceneEvent(_ body: Data) {
+        guard let op = body.first, let connection else { return }
+        switch op {
+        case SceneOp.ready:
+            remoteSceneReady = true
+            // Reply so the peer learns we're here even if our first "ready" landed
+            // before it had registered its handler.
+            connection.sendEvent(channel: GameChannel.scene.rawValue, body: Data([SceneOp.readyAck]))
+            announceIfBothReady()
+        case SceneOp.readyAck:
+            remoteSceneReady = true
+            announceIfBothReady()
+        default:
+            break
+        }
+    }
+
+    private func announceIfBothReady() {
+        guard !didAnnounceDuel, localSceneReady, remoteSceneReady,
+              let connection else { return }
+        didAnnounceDuel = true
+
+        let role = connection.isHost ? "HOST" : "PEER"
+        let opponent: String
+        if case let .connected(peerName) = connection.state {
+            opponent = peerName
+        } else {
+            opponent = "opponent"
+        }
+        print("[\(role)] \(connection.myName) joined \(opponent) joined.")
     }
     
     // MARK: - Touch Handling
