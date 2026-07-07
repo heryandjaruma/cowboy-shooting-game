@@ -36,7 +36,7 @@ struct ScreenTopBar: View {
 
             if let trailingName, !trailingName.isEmpty {
                 Text(trailingName)
-                    .font(.headingCSG2)
+                    .font(.headingCSG)
                     .foregroundColor(Color.ternaryCSG)
                     .lineLimit(1)
                     .padding(.vertical, 10)

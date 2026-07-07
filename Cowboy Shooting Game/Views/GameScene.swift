@@ -29,6 +29,7 @@ class GameScene: SKScene {
     private var didAnnounceDuel = false
 
     private var cancellables = Set<AnyCancellable>()
+    private let triggerController = TriggerController.shared //shot with Volume
 
     private enum SceneOp {
         static let ready: UInt8 = 0     // "I reached the GameScene"
@@ -66,6 +67,18 @@ class GameScene: SKScene {
 
         observeControllers()
         setupNetworking()
+        
+        triggerController.reactivate()
+
+        triggerController.onTrigger = { [weak self] _ in self?.attemptShoot()
+        }
+    }
+    
+    // MARK: - Unregister the Control when leaving scene
+    override func willMove(from view: SKView) {
+        super.willMove(from: view)
+
+        triggerController.onTrigger = nil
     }
 
     // MARK: - Controller Observation
@@ -243,12 +256,18 @@ class GameScene: SKScene {
     }
 
     // MARK: - Touch Handling
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+    
+    func attemptShoot() {
         guard case .fire = countdownController.phase,
               !shotController.didFire,
-              shotController.outcome == nil else { return }
+              shotController.outcome == nil else {
+            return
+        }
         shotController.fire()
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        attemptShoot()
     }
     
     // MARK: - Scene Setup Methods
