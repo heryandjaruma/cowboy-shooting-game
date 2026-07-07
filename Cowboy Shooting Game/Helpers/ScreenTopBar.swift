@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ScreenTopBar: View {
-    let title: String
+    let title: LocalizedStringKey
     /// Optional player name shown on the right — helps others spot the right
     /// lobby / opponent even when using a defaulted alias.
     var trailingName: String? = nil
