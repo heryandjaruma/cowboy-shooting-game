@@ -13,9 +13,9 @@ class GameScene: SKScene {
     var connection: GameConnectionManager?
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
+    var matchController: MatchController = MatchController()
     
     private var hearts: [SKSpriteNode] = []
-    private var currentLives = 3
     
     private var dimmingNode: SKSpriteNode!
     private var countdownLabel: SKLabelNode!
@@ -46,6 +46,7 @@ class GameScene: SKScene {
         if let connection {
             shotController.configure(connection: connection)
             countdownController.configure(connection: connection, shot: shotController)
+            matchController.configure(connection: connection, countdown: countdownController, shot: shotController)
         }
         
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
@@ -91,6 +92,18 @@ class GameScene: SKScene {
                 self?.handleOutcome(outcome)
             }
             .store(in: &cancellables)
+        
+        matchController.$myLives
+            .sink{ [weak self] lives in self?.updateHearts(lives)}
+            .store(in: &cancellables)
+        
+        matchController.$matchPhase
+            .sink { [weak self] phase in
+                if case .matchOver(let won) = phase {
+                    self?.showMatchOver(won: won)
+                }
+            }
+            .store(in: &cancellables)
     }
     
     private func handlePhaseChange(_ phase: CountdownController.Phase) {
@@ -98,7 +111,7 @@ class GameScene: SKScene {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
             countdownLabel.removeAllActions()
-            countdownLabel.text = "Going to Showdown Ground..."
+            countdownLabel.text = "Preparing the battle ground..."
             countdownLabel.fontSize = 30
             countdownLabel.fontColor = .white
             countdownLabel.setScale(1.0)
@@ -153,8 +166,8 @@ class GameScene: SKScene {
             fireNode.alpha = 1.0
             let grow = SKAction.scale(to: 1.05, duration: 0.18)
             let pulse = SKAction.sequence([
-                SKAction.scale(to: 0.95, duration: 0.35),
-                SKAction.scale(to: 1.05, duration: 0.35)
+                SKAction.scale(to: 0.42, duration: 0.35),
+                SKAction.scale(to: 0.69, duration: 0.35)
             ])
             fireNode.run(SKAction.sequence([grow, SKAction.repeatForever(pulse)]))
         }
@@ -167,24 +180,41 @@ class GameScene: SKScene {
         countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
         dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
         resultNode.removeAllActions()
-        let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose") // choose which to show
+        let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose")
         resultTex.filteringMode = .nearest
         resultNode.texture = resultTex
         resultNode.size = resultTex.size()
         resultNode.setScale(0.2)
         resultNode.alpha = 1.0
         resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 1.1, duration: 0.15),
-            SKAction.scale(to: 1.0, duration: 0.10)
+            SKAction.scale(to: 0.69, duration: 0.15),
+            SKAction.scale(to: 0.42, duration: 0.10)
         ]))
         
         if outcome == .loser {
-            currentLives = max(0, currentLives - 1)
-            if currentLives < hearts.count {
-                hearts[currentLives].texture = SKTexture(imageNamed: "lost_life")
-            }
             playGetHitHaptic()
         }
+    }
+    
+    
+    private func updateHearts(_ lives: Int) {
+        for (i, heart) in hearts.enumerated() {
+            heart.texture = SKTexture(imageNamed: i < lives ? "Life_full" : "lost_life")
+        }
+    }
+    
+    private func showMatchOver(won: Bool) {
+        resultNode.removeAllActions()
+        let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
+        tex.filteringMode = .nearest
+        resultNode.texture = tex
+        resultNode.size = tex.size()
+        resultNode.setScale(0.2)
+        resultNode.alpha = 1.0
+        resultNode.run(SKAction.sequence([
+            SKAction.scale(to: 0.69, duration: 0.15),
+            SKAction.scale(to: 0.42, duration: 0.10)
+        ]))
     }
     
     // MARK: - Networking (scene-ready handshake)
@@ -510,10 +540,7 @@ extension GameScene {
         handleOutcome(outcome)
     }
     func previewApply(livesRemaining: Int) {
-        currentLives = livesRemaining
-        for (i, heart) in hearts.enumerated() {
-            heart.texture = SKTexture(imageNamed: i < livesRemaining ? "Life_full" : "lost_life")
-        }
+        updateHearts(livesRemaining)
     }
 }
 #endif

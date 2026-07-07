@@ -23,39 +23,39 @@ import Combine
 
 @MainActor
 final class CountdownController: ObservableObject {
-
+    
     enum Phase: Equatable {
         case notReady        // connected; waiting for this player to tap Ready
         case waiting         // this player is ready ("Step right up.")
         case counting(Int)   // 3, 2
         case fire            // firing window open — draw!
     }
-
+    
     @Published private(set) var phase: Phase = .notReady
-
+    
     /// How long "3" and "2" are each shown — a touch longer than a real second.
     private let tickSeconds: Double = 1.3
     /// The suspenseful hold on "1" is randomized within this range (seconds).
     private let finalHoldRange: ClosedRange<Double> = 2...5
     /// Lead time before "3" appears, to let `begin` reach the joiner first.
     private let leadSeconds: Double = 0.5
-
+    
     private weak var connection: GameConnectionManager?
     private weak var shot: ShotController?
-
+    
     private var localReady = false
     private var remoteReady = false
     private var countdownTask: Task<Void, Never>?
-
+    
     /// One-byte opcodes carried inside a `GameChannel.match` payload.
     private enum Opcode {
         static let ready: UInt8 = 0   // "I'm ready"
         static let begin: UInt8 = 1   // host → joiner, followed by Double(finalHold)
         static let reset: UInt8 = 2   // "back to the lobby for a rematch"
     }
-
+    
     // MARK: - Wiring
-
+    
     func configure(connection: GameConnectionManager, shot: ShotController) {
         self.connection = connection
         self.shot = shot
@@ -63,9 +63,9 @@ final class CountdownController: ObservableObject {
             self?.handleIncoming(body)
         }
     }
-
+    
     // MARK: - Ready
-
+    
     func pressReady() {
         guard phase == .notReady, let connection else { return }
         localReady = true
@@ -73,7 +73,7 @@ final class CountdownController: ObservableObject {
         connection.sendEvent(channel: GameChannel.match.rawValue, body: Data([Opcode.ready]))
         startIfBothReady()
     }
-
+    
     /// Host-only: when both players are ready, pick the shared schedule and kick off.
     ///
     /// The window-open time is expressed as an absolute host-clock timestamp, so
@@ -83,23 +83,31 @@ final class CountdownController: ObservableObject {
         guard let connection, connection.isHost, localReady, remoteReady else { return }
         let hold = Double.random(in: finalHoldRange)
         let openHostNanos = DispatchTime.now().uptimeNanoseconds
-            + nanos(leadSeconds + 2 * tickSeconds + hold)
-
+        + nanos(leadSeconds + 2 * tickSeconds + hold)
+        
         var body = Data([Opcode.begin])
         body += BinaryCoding.encode(openHostNanos)
         body += BinaryCoding.encode(hold)
         connection.sendEvent(channel: GameChannel.match.rawValue, body: body)
-
+        
         scheduleCountdown(openHostNanos: openHostNanos, finalHold: hold)
     }
-
+    
     // MARK: - Rematch
-
+    
     func reset() {
         connection?.sendEvent(channel: GameChannel.match.rawValue, body: Data([Opcode.reset]))
         performReset()
     }
-
+    
+    /// Local-only reset for automatic round transitions where BOTH devices already
+    /// know independently (driven by MatchController after an outcome). Unlike reset(),
+    /// it sends no network message — broadcasting here would race against the peer's
+    /// own reset and wipe the fresh ready state pressReady() is about to set.
+    func resetForNextRound() {
+        performReset()
+    }
+    
     private func performReset() {
         countdownTask?.cancel()
         countdownTask = nil
@@ -108,9 +116,9 @@ final class CountdownController: ObservableObject {
         phase = .notReady
         shot?.reset()
     }
-
+    
     // MARK: - Incoming
-
+    
     private func handleIncoming(_ body: Data) {
         guard let opcode = body.first else { return }
         switch opcode {
@@ -128,9 +136,9 @@ final class CountdownController: ObservableObject {
             break
         }
     }
-
+    
     // MARK: - Countdown
-
+    
     /// Run the 3-2-1-fire schedule against the shared clock. Every step is pinned
     /// to an absolute local time derived from the host-clock window-open instant,
     /// so both devices tick and open the window together.
@@ -140,7 +148,7 @@ final class CountdownController: ObservableObject {
         let show1 = open &- nanos(finalHold)
         let show2 = show1 &- nanos(tickSeconds)
         let show3 = show2 &- nanos(tickSeconds)
-
+        
         countdownTask?.cancel()
         countdownTask = Task { [weak self] in
             guard let self else { return }
@@ -155,21 +163,21 @@ final class CountdownController: ObservableObject {
             }
         }
     }
-
+    
     /// Suspend until this device's monotonic clock reaches `targetNanos`.
     private func sleep(until targetNanos: UInt64) async throws {
         let now = DispatchTime.now().uptimeNanoseconds
         guard targetNanos > now else { return } // already due
         try await Task.sleep(for: .nanoseconds(Int64(targetNanos - now)))
     }
-
+    
     private func openWindow(atLocalNanos openNanos: UInt64) {
         phase = .fire
         // Measure reaction from the exact synced instant, not "now", so both
         // devices share the same zero point.
         shot?.startRound(windowOpenNanos: openNanos)
     }
-
+    
     private func nanos(_ seconds: Double) -> UInt64 {
         UInt64(max(0, seconds) * 1_000_000_000)
     }
