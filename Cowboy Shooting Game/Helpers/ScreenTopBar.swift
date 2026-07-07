@@ -8,7 +8,7 @@
 import SwiftUI
 
 struct ScreenTopBar: View {
-    let title: String
+    let title: LocalizedStringKey
     /// Optional player name shown on the right — helps others spot the right
     /// lobby / opponent even when using a defaulted alias.
     var trailingName: String? = nil
@@ -36,7 +36,7 @@ struct ScreenTopBar: View {
 
             if let trailingName, !trailingName.isEmpty {
                 Text(trailingName)
-                    .font(.headingCSG2)
+                    .font(.headingCSG)
                     .foregroundColor(Color.ternaryCSG)
                     .lineLimit(1)
                     .padding(.vertical, 10)

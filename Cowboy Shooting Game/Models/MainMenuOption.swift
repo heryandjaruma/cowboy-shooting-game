@@ -18,7 +18,7 @@ enum MenuDestination: Hashable {
     case settingsGame
     case helpGame
  
-    var title: String {
+    var title: LocalizedStringResource {
         switch self {
         case .createGame: "Create Game"
         case .joinGame: "Join Game"
