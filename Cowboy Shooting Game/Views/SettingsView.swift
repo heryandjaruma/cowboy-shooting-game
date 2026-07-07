@@ -9,10 +9,18 @@ import SwiftUI
 
 private struct SettingRow: View {
     let label: String
-    let value: String
-    var onDecrease: () -> Void = {}
-    var onIncrease: () -> Void = {}
-
+    let options: [String]
+    @Binding var selection: Int
+    private var value: String {
+        options.indices.contains(selection) ? options[selection] : ""
+    }
+    
+    private func cycle(by delta: Int){
+        guard !options.isEmpty else { return }
+        let count = options.count
+        selection = ((selection + delta) % count + count) % count
+    }
+    
     var body: some View {
         HStack(spacing: 12) {
             Text(label)
@@ -30,23 +38,26 @@ private struct SettingRow: View {
                 )
 
             HStack {
-                Button(action: onDecrease) {
+                Button{ cycle(by: -1) } label:{
                     Image(systemName: "chevron.left")
                 }
                 .buttonStyle(.cowboyIcon)
+                .disabled(options.count < 2)
 
                 Spacer()
 
                 Text(value)
                     .font(.headingCSG)
                     .foregroundColor(Color.ternaryCSG)
+                    .lineLimit(1)
 
                 Spacer()
 
-                Button(action: onIncrease) {
+                Button{ cycle(by: 1) } label:{
                     Image(systemName: "chevron.right")
                 }
                 .buttonStyle(.cowboyIcon)
+                .disabled(options.count < 2)
             }
             .padding(.horizontal, 14)
             .padding(.vertical, 14)
@@ -100,6 +111,26 @@ struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
     @ObservedObject private var triggerController = TriggerController.shared
 
+    // Helpers/AppSettings for these
+    @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
+    @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = true
+
+    private let grayscaleOptions = ["OFF", "ON"]
+
+    private var languageIndex: Binding<Int> {
+        Binding(
+            get: { AppSettings.languageCodes.firstIndex(of: languageCode) ?? 0 },
+            set: { languageCode = AppSettings.languageCodes[$0] }
+        )
+    }
+
+    private var grayscaleIndex: Binding<Int> {
+        Binding(
+            get: { grayscaleEnabled ? 1 : 0 },
+            set: { grayscaleEnabled = ($0 == 1) }
+        )
+    }
+
     var body: some View {
         ZStack(alignment: .top) {
             Image(.backgroundMainScreen)
@@ -116,8 +147,8 @@ struct SettingsView: View {
                 }
 
                 VStack(spacing: 16) {
-                    SettingRow(label: "Language", value: "English")
-                    SettingRow(label: "Grayscale Mode", value: "OFF")
+                    SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
+                    SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
 
                     SettingSliderRow(
                         label: "Gunshot Noise",

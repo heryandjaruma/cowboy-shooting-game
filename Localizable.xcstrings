@@ -15,7 +15,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Batak"
+            "value" : "Batal"
           }
         }
       }
@@ -89,7 +89,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Tingkat Suara"
+            "value" : "Tingkat Suara:"
           }
         }
       }
@@ -140,7 +140,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Game dibuat, meunggu penantang"
+            "value" : "Game dibuat, menunggu penantang"
           }
         }
       }
@@ -150,7 +150,7 @@
         "id" : {
           "stringUnit" : {
             "state" : "translated",
-            "value" : "Simpang"
+            "value" : "Simpan"
           }
         }
       }

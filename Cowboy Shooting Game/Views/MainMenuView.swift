@@ -43,6 +43,10 @@ struct MainMenuView: View {
                                     .allowsTightening(true)
                                     .multilineTextAlignment(.center)
                                     .font(.headingCSG)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.6)
+                                    .allowsTightening(true)
+                                    .multilineTextAlignment(.center)
                             }
                             .buttonStyle(.cowboyCompact)
                         }
