@@ -8,21 +8,37 @@
 import SwiftUI
 
 struct CowboyButtonStyle: ButtonStyle {
-    var stretches: Bool = true
+    var compact: Bool = false
 
     func makeBody(configuration: Configuration) -> some View {
         configuration.label
             .font(.system(size: 18, weight: .bold, design: .monospaced))
             .foregroundColor(Color.ternaryCSG)
-            .padding(.horizontal, stretches ? 0 : 28)
-            .frame(maxWidth: stretches ? .infinity : nil, minHeight: 50)
+            .padding(.horizontal, compact ? 20 : 28)
+            .padding(.vertical,10)
+            .frame(height: 60)
             .background(
-                RoundedRectangle(cornerRadius: 12)
-                    .fill(Color.primaryCSG)
+                Image(.button)
+                    . resizable(capInsets: EdgeInsets(top: 1, leading: 1, bottom: 1, trailing: 1), resizingMode: .stretch)
+
             )
-            .overlay(
-                RoundedRectangle(cornerRadius: 12)
-                    .stroke(Color.ternaryCSG, lineWidth: 3)
+            .scaleEffect(configuration.isPressed ? 0.96 : 1)
+            .opacity(configuration.isPressed ? 0.85 : 1)
+            .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+    }
+}
+
+struct CowboyButtonJoin: ButtonStyle {
+    func makeBody(configuration: Configuration) -> some View {
+        configuration.label
+            .font(.system(size: 18, weight: .bold, design: .monospaced))
+            .foregroundColor(Color.ternaryCSG)
+            .padding()
+            .frame(height: 60)
+            .background(
+                RoundedRectangle(cornerRadius:12)
+                    .fill(Color.secondaryCSG)
+                    .stroke(Color.ternaryCSG,lineWidth: 4)
             )
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
@@ -31,9 +47,9 @@ struct CowboyButtonStyle: ButtonStyle {
 }
 
 extension ButtonStyle where Self == CowboyButtonStyle {
-    static var cowboy: CowboyButtonStyle { CowboyButtonStyle(stretches: true) }
-
-    static var cowboyCompact: CowboyButtonStyle { CowboyButtonStyle(stretches: false) }
+    static var cowboy: CowboyButtonStyle { CowboyButtonStyle(compact: false) }
+    static var cowboyCompact: CowboyButtonStyle { CowboyButtonStyle(compact: true) }
+    static var cowboyJoin: CowboyButtonJoin { CowboyButtonJoin() }
 }
 
 /// ICON ONLY
@@ -44,20 +60,31 @@ struct CowboyIconButtonStyle: ButtonStyle {
             .foregroundColor(Color.ternaryCSG)
             .frame(width: 44, height: 44)
             .background(
-                Circle()
-                    .fill(Color.secondaryCSG)
-            )
-            .overlay(
-                Circle()
-                    .stroke(Color.ternaryCSG, lineWidth: 3)
+                Image(.buttonRound)
+                    .resizable()
+                    .scaledToFit()
             )
             .scaleEffect(configuration.isPressed ? 0.9 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
     }
 }
- 
+
 extension ButtonStyle where Self == CowboyIconButtonStyle {
     static var cowboyIcon: CowboyIconButtonStyle { CowboyIconButtonStyle() }
 }
  
+struct ButtonPreview : View {
+    var body : some View {
+        Button{
+            //empty
+        }label: {
+            Image(systemName: "gear")
+        }
+        .buttonStyle(.cowboyIcon)
+    }
+}
+
+#Preview {
+    ButtonPreview()
+}

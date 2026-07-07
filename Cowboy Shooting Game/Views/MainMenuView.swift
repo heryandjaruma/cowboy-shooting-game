@@ -29,11 +29,10 @@ struct MainMenuView: View {
                     .ignoresSafeArea()
 
                 VStack(spacing: 16) {
-                    Text("COWBOY\nSHOOTERS")
-                        .font(.titleCSG)
-                        .multilineTextAlignment(.center)
+                    TitleView()
+                        .padding(.top, 20)
 
-                    VStack(spacing: 14) {
+                    VStack(spacing: 9) {
                         ForEach(menuOptions) { option in
                             Button {
                                 path.append(option.targetDestination)
@@ -43,6 +42,7 @@ struct MainMenuView: View {
                                     .minimumScaleFactor(0.6)
                                     .allowsTightening(true)
                                     .multilineTextAlignment(.center)
+                                    .font(.headingCSG)
                             }
                             .buttonStyle(.cowboyCompact)
                         }
@@ -103,17 +103,6 @@ struct MainMenuView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("What does the town call you, Slinger?")
-            }
-        }
-        // Trigger button di-aktifkan sekali di root, tetap hidup selama app jalan
-        .onHardwareTrigger { direction in
-            switch direction {
-            case .up:
-                // TODO: aksi trigger up (misal: shoot)
-                break
-            case .down:
-                // TODO: aksi trigger down
-                break
             }
         }
     }
