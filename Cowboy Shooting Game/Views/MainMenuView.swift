@@ -39,6 +39,10 @@ struct MainMenuView: View {
                                 path.append(option.targetDestination)
                             } label: {
                                 Text(option.targetDestination.title)
+                                    .lineLimit(2)
+                                    .minimumScaleFactor(0.6)
+                                    .allowsTightening(true)
+                                    .multilineTextAlignment(.center)
                             }
                             .buttonStyle(.cowboyCompact)
                         }
