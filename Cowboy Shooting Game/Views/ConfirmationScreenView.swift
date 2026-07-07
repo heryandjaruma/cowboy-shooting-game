@@ -82,7 +82,7 @@ struct ConfirmationScreenView: View {
         }
         .fullScreenCover(isPresented: $navigateToGame) {
             GeometryReader { geometry in
-                SpriteView(scene: createGameScene(size: geometry.size))
+                SpriteView(scene: createGameScene(size: geometry.size)) // start a SpriteKit view
                     .ignoresSafeArea()
             }
         }
@@ -113,7 +113,8 @@ struct ConfirmationScreenView: View {
                     .stroke(Color.ternaryCSG, lineWidth: 3)
             )
     }
-
+    
+    // init a game scene
     private func createGameScene(size: CGSize) -> SKScene {
         let scene = GameScene(size: size)
         scene.scaleMode = .resizeFill
