@@ -11,6 +11,7 @@ class GameScene: SKScene {
     // MARK: - Properties
     
     var connection: GameConnectionManager?
+    var onRequestReturnToMenu: (() -> Void)?
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
     var matchController: MatchController = MatchController()
@@ -97,10 +98,12 @@ class GameScene: SKScene {
             .sink{ [weak self] lives in self?.updateHearts(lives)}
             .store(in: &cancellables)
         
-        matchController.$matchPhase
+        matchController.$matchPhase // observe phase for awaiting tap
             .sink { [weak self] phase in
-                if case .matchOver(let won) = phase {
-                    self?.showMatchOver(won: won)
+                switch phase {
+                case .matchOver(let won): self?.showMatchOver(won: won)
+                case .awaitingContinue:   self?.showContinuePrompt()
+                default: break
                 }
             }
             .store(in: &cancellables)
@@ -111,6 +114,7 @@ class GameScene: SKScene {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
             countdownLabel.removeAllActions()
+            countdownLabel.position = CGPoint(x: 0, y: 0) // rese position after moved by tap to continue
             countdownLabel.text = "Preparing the battle ground..."
             countdownLabel.fontSize = 30
             countdownLabel.fontColor = .white
@@ -180,10 +184,15 @@ class GameScene: SKScene {
         countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
         dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
         resultNode.removeAllActions()
+        
         let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose")
         resultTex.filteringMode = .nearest
+        
+        let targetHeight: CGFloat = 260
+        let aspect = resultTex.size().width / resultTex.size().height
         resultNode.texture = resultTex
-        resultNode.size = resultTex.size()
+        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
+        
         resultNode.setScale(0.2)
         resultNode.alpha = 1.0
         resultNode.run(SKAction.sequence([
@@ -196,7 +205,6 @@ class GameScene: SKScene {
         }
     }
     
-    
     private func updateHearts(_ lives: Int) {
         for (i, heart) in hearts.enumerated() {
             heart.texture = SKTexture(imageNamed: i < lives ? "Life_full" : "lost_life")
@@ -207,15 +215,50 @@ class GameScene: SKScene {
         resultNode.removeAllActions()
         let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
         tex.filteringMode = .nearest
+        
+        let targetHeight: CGFloat = 400
+        let aspect = tex.size().width / tex.size().height
         resultNode.texture = tex
-        resultNode.size = tex.size()
+        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
+        
         resultNode.setScale(0.2)
         resultNode.alpha = 1.0
         resultNode.run(SKAction.sequence([
             SKAction.scale(to: 0.69, duration: 0.15),
             SKAction.scale(to: 0.42, duration: 0.10)
         ]))
+        
+        showReturnToMenuPrompt()
     }
+    
+    private func showContinuePrompt() {
+        countdownLabel.removeAllActions()
+        countdownLabel.text = "Tap to continue"
+        countdownLabel.fontSize = 44
+        countdownLabel.fontColor = .white
+        countdownLabel.position = CGPoint(x: 0, y: -100)
+        countdownLabel.setScale(1.0)
+        countdownLabel.alpha = 1.0
+        countdownLabel.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.3, duration: 0.6),
+            .fadeAlpha(to: 1.0, duration: 0.6)
+        ])))
+    }
+    
+    private func showReturnToMenuPrompt() {
+        countdownLabel.removeAllActions()
+        countdownLabel.position = CGPoint(x: 0, y: -280)   // below the result image
+        countdownLabel.text = "Tap to return to menu"
+        countdownLabel.fontSize = 36
+        countdownLabel.fontColor = .white
+        countdownLabel.setScale(1.0)
+        countdownLabel.alpha = 1.0
+        countdownLabel.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.3, duration: 0.6),
+            .fadeAlpha(to: 1.0, duration: 0.6)
+        ])))
+    }
+    
     
     // MARK: - Networking (scene-ready handshake)
     
@@ -273,6 +316,14 @@ class GameScene: SKScene {
     // MARK: - Touch Handling
     
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        if case .matchOver = matchController.matchPhase {
+            onRequestReturnToMenu?()
+            return
+        }
+        if matchController.matchPhase == .awaitingContinue {
+            matchController.continueToNextRound()
+            return
+        }
         guard case .fire = countdownController.phase,
               !shotController.didFire,
               shotController.outcome == nil else { return }
@@ -548,7 +599,7 @@ extension GameScene {
 #if DEBUG // preview with helper for didMove
 private struct GameScenePreviewHarness: View {
     let configure: (GameScene) -> Void
-
+    
     var body: some View {
         GeometryReader { geo in
             let scene: GameScene = {
@@ -556,7 +607,7 @@ private struct GameScenePreviewHarness: View {
                 s.scaleMode = .resizeFill
                 return s
             }()
-
+            
             SpriteView(scene: scene)
                 .ignoresSafeArea()
                 .onAppear {

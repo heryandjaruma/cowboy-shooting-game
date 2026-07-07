@@ -14,8 +14,11 @@ final class MatchController: ObservableObject {
     enum MatchPhase: Equatable {
         case playing
         case roundOver(ShotController.Outcome)
+        case awaitingContinue // waiting for tap to continue
         case matchOver(won: Bool)
     }
+    
+    private let resultLingerSeconds: Double = 1.0   // let win/lose land before the prompt
     
     @Published private(set) var myLives = 3
     @Published private(set) var opponentLives = 3
@@ -71,7 +74,8 @@ final class MatchController: ObservableObject {
         } else {
             connection.sendEvent(channel: GameChannel.life.rawValue,
                                  body: Data([Opcode.continueRound, UInt8(hostLives), UInt8(joinerLives)]))
-            scheduleNextRound()
+//            scheduleNextRound()
+            scheduleContinuePrompt()
         }
         
     }
@@ -90,11 +94,27 @@ final class MatchController: ObservableObject {
             // Joiner's own perspective: host is "opponent", joiner is "self"
             opponentLives = Int(body[1])    // host's lives
             myLives = Int(body[2])          // joiner's own lives
-            scheduleNextRound()
+//            scheduleNextRound()
+            scheduleContinuePrompt() // wait for continue tap
         default:
             break
         }
         
+    }
+    
+    func continueToNextRound() {
+        guard matchPhase == .awaitingContinue else { return }
+        matchPhase = .playing
+        countdown?.resetForNextRound()   // clears outcome, re-arms shooter, phase → .notReady
+        countdown?.pressReady()          // this device readies; countdown starts once BOTH tap
+    }
+    
+    // schedule a tap to continue
+    private func scheduleContinuePrompt() {
+        DispatchQueue.main.asyncAfter(deadline: .now() + resultLingerSeconds) { [weak self] in
+            guard let self, case .roundOver = self.matchPhase else { return }
+            self.matchPhase = .awaitingContinue
+        }
     }
     
     private func scheduleNextRound() {

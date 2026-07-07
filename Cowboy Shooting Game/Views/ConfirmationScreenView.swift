@@ -13,19 +13,19 @@ struct ConfirmationScreenView: View {
     @StateObject private var controller: ConfirmationController
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToGame = false
-
+    
     init(connection: GameConnectionManager) {
         _connection = ObservedObject(wrappedValue: connection)
         _controller = StateObject(wrappedValue: ConfirmationController(connection: connection))
     }
-
+    
     var body: some View {
         ZStack {
             Image(.backgroundMainScreen)
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
-
+            
             VStack {
                 ScreenTopBar(title: "GAME SET") {
                     connection.stopAll()
@@ -33,15 +33,15 @@ struct ConfirmationScreenView: View {
                 }
                 Spacer()
             }
-
+            
             // Duelists panel
             HStack(spacing: 24) {
                 nameBox(leftName)
-
+                
                 Text("vs")
                     .font(.headingCSG)
                     .foregroundColor(Color.ternaryCSG)
-
+                
                 nameBox(rightName)
             }
             .padding(24)
@@ -51,7 +51,7 @@ struct ConfirmationScreenView: View {
                     .stroke(Color.ternaryCSG, lineWidth: 4)
             )
             .padding(.horizontal, 40)
-
+            
             // Ready button, bottom-right
             VStack {
                 Spacer()
@@ -87,18 +87,18 @@ struct ConfirmationScreenView: View {
             }
         }
     }
-
+    
     // MARK: - Pieces
-
+    
     private var opponentName: String {
         if case let .connected(peerName) = connection.state { return peerName }
         return "…"
     }
-
+    
     /// Host is always shown on the left, challenger on the right.
     private var leftName: String { connection.isHost ? connection.myName : opponentName }
     private var rightName: String { connection.isHost ? opponentName : connection.myName }
-
+    
     private func nameBox(_ name: String) -> some View {
         Text(name)
             .font(.headingCSG)
@@ -119,6 +119,10 @@ struct ConfirmationScreenView: View {
         let scene = GameScene(size: size)
         scene.scaleMode = .resizeFill
         scene.connection = connection
+        scene.onRequestReturnToMenu = { [weak connection] in
+            connection?.stopAll()
+            dismiss()
+        }
         return scene
     }
 }

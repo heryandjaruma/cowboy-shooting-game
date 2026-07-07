@@ -100,19 +100,19 @@ final class CountdownController: ObservableObject {
         performReset()
     }
     
-    /// Local-only reset for automatic round transitions where BOTH devices already
-    /// know independently (driven by MatchController after an outcome). Unlike reset(),
-    /// it sends no network message — broadcasting here would race against the peer's
-    /// own reset and wipe the fresh ready state pressReady() is about to set.
+    /// Local-only reset for automatic round transitions. Crucially does NOT clear
+    /// remoteReady: the peer may have tapped-to-continue and sent its `ready` before
+    /// this device reset, and that signal must survive or the both-ready gate deadlocks
+    /// (peer counts down, this device stuck on "waiting").
     func resetForNextRound() {
-        performReset()
+        performReset(clearRemoteReady: false)
     }
     
-    private func performReset() {
+    private func performReset(clearRemoteReady: Bool = true) {
         countdownTask?.cancel()
         countdownTask = nil
         localReady = false
-        remoteReady = false
+        if clearRemoteReady { remoteReady = false }
         phase = .notReady
         shot?.reset()
     }
