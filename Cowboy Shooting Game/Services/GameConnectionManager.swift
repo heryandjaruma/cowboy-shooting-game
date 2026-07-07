@@ -72,8 +72,43 @@ final class GameConnectionManager: ObservableObject {
         static let pong: UInt8 = 1  // host → joiner: + t0 + t1 + t2
     }
 
+    /// `UserDefaults` key under which the player's chosen display name is stored.
+    /// Bound to the "Got a name?" prompt in `MainMenuView`.
+    static let playerNameDefaultsKey = "playerName"
+
+    /// `UserDefaults` key for the auto-assigned fallback alias — persisted once so
+    /// it stays stable across reads and launches until the player picks a name.
+    private static let autoNameDefaultsKey = "playerAutoName"
+
+    /// Wild-West aliases handed out when the player hasn't chosen a name. Keeps
+    /// duelists recognizable and avoids the generic "iPhone" device name that
+    /// `UIDevice.current.name` returns since iOS 16 (a privacy change).
+    private static let randomNames = [
+        "Quick Draw", "Dead Eye", "El Bandito", "The Kid", "Doc Holla",
+        "Six-Shooter", "Calamity", "Rustler", "Lone Ranger", "Buckshot",
+        "Wild Bill", "Ghost Rider", "Ace", "Maverick", "Tumbleweed"
+    ]
+
     /// Human-readable name advertised to / shown by the other device.
-    let myName: String
+    ///
+    /// Prefers the name the player typed; otherwise returns the stable
+    /// auto-assigned alias. Read fresh each time so a name change takes effect on
+    /// the next host/join.
+    var myName: String {
+        if let nameOverride { return nameOverride }
+        let defaults = UserDefaults.standard
+        if let chosen = defaults.string(forKey: Self.playerNameDefaultsKey)?
+            .trimmingCharacters(in: .whitespacesAndNewlines), !chosen.isEmpty {
+            return chosen
+        }
+        if let auto = defaults.string(forKey: Self.autoNameDefaultsKey), !auto.isEmpty {
+            return auto
+        }
+        return Self.randomNames.first ?? "Stranger"
+    }
+
+    /// Explicit name injected at init (used by previews); overrides the stored name.
+    private let nameOverride: String?
 
     // MARK: Private
 
@@ -84,10 +119,20 @@ final class GameConnectionManager: ObservableObject {
     private var connection: NWConnection?
 
     init(myName: String? = nil) {
-        // UIDevice.current is main-actor isolated; read it inside this @MainActor init.
-        self.myName = myName ?? UIDevice.current.name
+        self.nameOverride = myName
+        if myName == nil { Self.ensureAutoName() }
         onEvent(channel: GameChannel.clock.rawValue) { [weak self] body in
             self?.handleClockEvent(body)
+        }
+    }
+
+    /// Assign and persist a random alias once, so a player who never picks a name
+    /// still gets a stable, recognizable identity instead of "iPhone".
+    private static func ensureAutoName() {
+        let defaults = UserDefaults.standard
+        let existing = defaults.string(forKey: autoNameDefaultsKey) ?? ""
+        if existing.isEmpty {
+            defaults.set(randomNames.randomElement() ?? "Stranger", forKey: autoNameDefaultsKey)
         }
     }
 

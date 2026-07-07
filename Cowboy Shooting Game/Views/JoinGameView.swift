@@ -112,8 +112,8 @@ struct JoinGameView: View {
                 .ignoresSafeArea(edges: .all)
 
             VStack(spacing: 20) {
-                ScreenTopBar(title: "JOIN GAME") {
-                    controller.stop()
+                ScreenTopBar(title: "JOIN GAME", trailingName: connection.myName) {
+                    controller.stop() // leaving the list — tear down here, not on disappear.
                     dismiss()
                 }
 
