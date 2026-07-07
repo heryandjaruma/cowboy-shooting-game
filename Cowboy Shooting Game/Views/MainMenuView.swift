@@ -11,6 +11,10 @@ struct MainMenuView: View {
     @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
+    @AppStorage(GameConnectionManager.playerNameDefaultsKey) private var playerName = ""
+    @State private var showNamePrompt = false
+    @State private var nameDraft = ""
+
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
         MenuOption(targetDestination: .joinGame)
@@ -38,6 +42,14 @@ struct MainMenuView: View {
                             }
                             .buttonStyle(.cowboyCompact)
                         }
+
+                        Button {
+                            nameDraft = playerName
+                            showNamePrompt = true
+                        } label: {
+                            Text("Got a name?")
+                        }
+                        .buttonStyle(.cowboyCompact)
                     }
                     .padding(.top, 20)
                 }
@@ -79,6 +91,15 @@ struct MainMenuView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
+            .alert("Got a name?", isPresented: $showNamePrompt) {
+                TextField("Enter your name", text: $nameDraft)
+                Button("Save") {
+                    playerName = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+                }
+                Button("Cancel", role: .cancel) {}
+            } message: {
+                Text("What does the town call you, Slinger?")
+            }
         }
         // Trigger button di-aktifkan sekali di root, tetap hidup selama app jalan
         .onHardwareTrigger { direction in

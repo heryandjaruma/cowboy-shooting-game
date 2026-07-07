@@ -9,6 +9,9 @@ import SwiftUI
 
 struct ScreenTopBar: View {
     let title: String
+    /// Optional player name shown on the right — helps others spot the right
+    /// lobby / opponent even when using a defaulted alias.
+    var trailingName: String? = nil
     var onBack: () -> Void
 
     var body: some View {
@@ -17,7 +20,7 @@ struct ScreenTopBar: View {
                 Text("<")
             }
             .buttonStyle(.cowboyIcon)
-            
+
             Text(title)
                 .font(.headingCSG)
                 .foregroundColor(Color.ternaryCSG)
@@ -27,6 +30,19 @@ struct ScreenTopBar: View {
                         .stroke(Color.ternaryCSG, lineWidth: 4)
                         .fill(Color.primaryCSG))
             Spacer()
+
+            if let trailingName, !trailingName.isEmpty {
+                Text(trailingName)
+                    .font(.headingCSG2)
+                    .foregroundColor(Color.ternaryCSG)
+                    .lineLimit(1)
+                    .padding(.vertical, 10)
+                    .padding(.horizontal, 14)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .stroke(Color.ternaryCSG, lineWidth: 4)
+                            .fill(Color.secondaryCSG))
+            }
         }
         .padding(.horizontal, 20)
         .padding(.top, 20)

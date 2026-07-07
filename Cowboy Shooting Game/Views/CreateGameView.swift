@@ -22,7 +22,7 @@ struct CreateGameView: View {
                 .ignoresSafeArea()
 
             VStack {
-                ScreenTopBar(title: "Create Game") {
+                ScreenTopBar(title: "Create Game", trailingName: connection.myName) {
                     connection.stopAll() // leaving the room — tear down here, not on disappear.
                     dismiss()
                 }
