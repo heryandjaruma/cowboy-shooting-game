@@ -7,27 +7,28 @@ import UIKit // Required for NSDataAsset
 import Combine
 
 class GameScene: SKScene {
-
+    
     // MARK: - Properties
-
+    
     var connection: GameConnectionManager?
+    var onRequestReturnToMenu: (() -> Void)?
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
-
+    var matchController: MatchController = MatchController()
+    
     private var hearts: [SKSpriteNode] = []
-    private var currentLives = 3
-
+    
     private var dimmingNode: SKSpriteNode!
     private var countdownLabel: SKLabelNode!
-    private var countdownNode: SKSpriteNode!  // num3 / num2 images
+    private var countdownNode: SKSpriteNode!  // num3 / num2 / num1 images
     private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
     private var resultNode: SKSpriteNode!      // "win" / "lose" result image
     private var bangNode: SKSpriteNode!        // shot-effect image
-
+    
     private var localSceneReady = false
     private var remoteSceneReady = false
     private var didAnnounceDuel = false
-
+    
     private var cancellables = Set<AnyCancellable>()
     private let triggerController = TriggerController.shared //shot with Volume
 
@@ -35,22 +36,23 @@ class GameScene: SKScene {
         static let ready: UInt8 = 0     // "I reached the GameScene"
         static let readyAck: UInt8 = 1  // "…and I heard that you did too"
     }
-
+    
     // Hardware integration properties
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
-
+    
     // MARK: - Lifecycle
-
+    
     override func didMove(to view: SKView) {
         if let connection {
             shotController.configure(connection: connection)
             countdownController.configure(connection: connection, shot: shotController)
+            matchController.configure(connection: connection, countdown: countdownController, shot: shotController)
         }
-
+        
         self.anchorPoint = CGPoint(x: 0.5, y: 0.5)
-
+        
         setupBackground()
         setupGun()
         setupPlayerUI()
@@ -61,16 +63,17 @@ class GameScene: SKScene {
         setupFireNode()
         setupResultNode()
         setupBangNode()
-
+        
         prepareHaptics()
         setupAudioSession()
-
+        
         observeControllers()
         setupNetworking()
         
         triggerController.reactivate()
 
-        triggerController.onTrigger = { [weak self] _ in self?.attemptShoot()
+        triggerController.onTrigger = { [weak self] _ in
+            self?.attemptFire()
         }
     }
     
@@ -80,7 +83,7 @@ class GameScene: SKScene {
 
         triggerController.onTrigger = nil
     }
-
+    
     // MARK: - Controller Observation
     // GameKit cannot directly use the @Publishable,
     // so instead it needs to subscribe to the changes.
@@ -90,72 +93,85 @@ class GameScene: SKScene {
                 self?.handlePhaseChange(phase)
             }
             .store(in: &cancellables)
-
+        
         shotController.$didFire
             .sink { [weak self] didFire in
                 guard didFire else { return }
                 self?.bang()
             }
             .store(in: &cancellables)
-
+        
         shotController.$outcome
             .sink { [weak self] outcome in
                 guard let outcome else { return }
                 self?.handleOutcome(outcome)
             }
             .store(in: &cancellables)
+        
+        matchController.$myLives
+            .sink{ [weak self] lives in self?.updateHearts(lives)}
+            .store(in: &cancellables)
+        
+        matchController.$matchPhase // observe phase for awaiting tap
+            .sink { [weak self] phase in
+                switch phase {
+                case .matchOver(let won): self?.showMatchOver(won: won)
+                case .awaitingContinue:   self?.showContinuePrompt()
+                default: break
+                }
+            }
+            .store(in: &cancellables)
     }
-
+    
     private func handlePhaseChange(_ phase: CountdownController.Phase) {
         switch phase {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
             countdownLabel.removeAllActions()
-            countdownLabel.text = "Waiting..."
-            countdownLabel.fontSize = 80
+            countdownLabel.position = CGPoint(x: 0, y: 0) // rese position after moved by tap to continue
+            countdownLabel.text = "Preparing the battle ground..."
+            countdownLabel.fontSize = 30
             countdownLabel.fontColor = .white
             countdownLabel.setScale(1.0)
             countdownLabel.alpha = 1.0
             countdownNode.removeAllActions(); countdownNode.alpha = 0.0
             fireNode.removeAllActions();     fireNode.alpha = 0.0
             resultNode.removeAllActions();   resultNode.alpha = 0.0
-
+            
         case .waiting:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
             countdownLabel.removeAllActions()
-            countdownLabel.text = "Step right up."
-            countdownLabel.fontSize = 80
+            countdownLabel.text = "May the Fastest Hand Win..."
+            countdownLabel.fontSize = 40
             countdownLabel.fontColor = .white
             countdownLabel.setScale(1.0)
             countdownLabel.alpha = 1.0
             countdownNode.removeAllActions(); countdownNode.alpha = 0.0
             fireNode.removeAllActions();     fireNode.alpha = 0.0
             resultNode.removeAllActions();   resultNode.alpha = 0.0
-
+            
         case .counting(let n):
             dimmingNode.alpha = 0.7
             fireNode.removeAllActions();   fireNode.alpha = 0.0
             resultNode.removeAllActions(); resultNode.alpha = 0.0
-
-            guard n == 3 || n == 2 else {
-                // No asset for 1 — blank pause before fire
-                countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
-                countdownNode.removeAllActions();  countdownNode.alpha = 0.0
-                break
-            }
+            
             countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
-            let numTex = SKTexture(imageNamed: n == 3 ? "num3" : "num2")
+            let numTex = SKTexture(imageNamed: "num\(n)")
             numTex.filteringMode = .nearest
             countdownNode.texture = numTex
-            countdownNode.size = numTex.size()   // must set size when texture is assigned after init
+            
+            let targetHeight: CGFloat = 220
+            let aspect = numTex.size().width / numTex.size().height
+            countdownNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
+            
             countdownNode.removeAllActions()
             countdownNode.setScale(0.2)
             countdownNode.alpha = 1.0
             countdownNode.run(SKAction.sequence([
-                SKAction.scale(to: 1.1, duration: 0.12),
-                SKAction.scale(to: 1.0, duration: 0.08)
+                SKAction.scale(to: 0.69, duration: 0.12),
+                SKAction.scale(to: 0.42, duration: 0.08)
             ]))
-
+            
         case .fire:
             // Lift the dimming overlay and hide number nodes
             countdownLabel.removeAllActions(); countdownLabel.run(SKAction.fadeOut(withDuration: 0.15))
@@ -168,13 +184,13 @@ class GameScene: SKScene {
             fireNode.alpha = 1.0
             let grow = SKAction.scale(to: 1.05, duration: 0.18)
             let pulse = SKAction.sequence([
-                SKAction.scale(to: 0.95, duration: 0.35),
-                SKAction.scale(to: 1.05, duration: 0.35)
+                SKAction.scale(to: 0.42, duration: 0.35),
+                SKAction.scale(to: 0.69, duration: 0.35)
             ])
             fireNode.run(SKAction.sequence([grow, SKAction.repeatForever(pulse)]))
         }
     }
-
+    
     private func handleOutcome(_ outcome: ShotController.Outcome) {
         // Stop any in-progress animations
         fireNode.removeAllActions();   fireNode.run(SKAction.fadeOut(withDuration: 0.15))
@@ -182,44 +198,100 @@ class GameScene: SKScene {
         countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
         dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
         resultNode.removeAllActions()
-        let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose") // choose which to show
+        
+        let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose")
         resultTex.filteringMode = .nearest
+        
+        let targetHeight: CGFloat = 260
+        let aspect = resultTex.size().width / resultTex.size().height
         resultNode.texture = resultTex
-        resultNode.size = resultTex.size()
+        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
+        
         resultNode.setScale(0.2)
         resultNode.alpha = 1.0
         resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 1.1, duration: 0.15),
-            SKAction.scale(to: 1.0, duration: 0.10)
+            SKAction.scale(to: 0.69, duration: 0.15),
+            SKAction.scale(to: 0.42, duration: 0.10)
         ]))
-
+        
         if outcome == .loser {
-            currentLives = max(0, currentLives - 1)
-            if currentLives < hearts.count {
-                hearts[currentLives].texture = SKTexture(imageNamed: "lost_life")
-            }
             playGetHitHaptic()
         }
     }
-
+    
+    private func updateHearts(_ lives: Int) {
+        for (i, heart) in hearts.enumerated() {
+            heart.texture = SKTexture(imageNamed: i < lives ? "Life_full" : "lost_life")
+        }
+    }
+    
+    private func showMatchOver(won: Bool) {
+        resultNode.removeAllActions()
+        let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
+        tex.filteringMode = .nearest
+        
+        let targetHeight: CGFloat = 400
+        let aspect = tex.size().width / tex.size().height
+        resultNode.texture = tex
+        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
+        
+        resultNode.setScale(0.2)
+        resultNode.alpha = 1.0
+        resultNode.run(SKAction.sequence([
+            SKAction.scale(to: 0.69, duration: 0.15),
+            SKAction.scale(to: 0.42, duration: 0.10)
+        ]))
+        
+        showReturnToMenuPrompt()
+    }
+    
+    private func showContinuePrompt() {
+        countdownLabel.removeAllActions()
+        countdownLabel.text = "Tap to continue"
+        countdownLabel.fontSize = 44
+        countdownLabel.fontColor = .white
+        countdownLabel.position = CGPoint(x: 0, y: -100)
+        countdownLabel.setScale(1.0)
+        countdownLabel.alpha = 1.0
+        countdownLabel.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.3, duration: 0.6),
+            .fadeAlpha(to: 1.0, duration: 0.6)
+        ])))
+    }
+    
+    private func showReturnToMenuPrompt() {
+        countdownLabel.removeAllActions()
+        countdownLabel.position = CGPoint(x: 0, y: -280)   // below the result image
+        countdownLabel.text = "Tap to return to menu"
+        countdownLabel.fontSize = 36
+        countdownLabel.fontColor = .white
+        countdownLabel.setScale(1.0)
+        countdownLabel.alpha = 1.0
+        countdownLabel.run(.repeatForever(.sequence([
+            .fadeAlpha(to: 0.3, duration: 0.6),
+            .fadeAlpha(to: 1.0, duration: 0.6)
+        ])))
+    }
+    
+    
     // MARK: - Networking (scene-ready handshake)
-
+    
     private func setupNetworking() {
         guard let connection else {
             print("⚠️ GameScene has no connection — running solo.")
             return
         }
-
+        
         // Register before announcing so we can't miss the peer's reply.
         connection.onEvent(channel: GameChannel.scene.rawValue) { [weak self] body in
             self?.handleSceneEvent(body)
         }
-
+        
         localSceneReady = true
         connection.sendEvent(channel: GameChannel.scene.rawValue, body: Data([SceneOp.ready]))
         announceIfBothReady()
     }
-
+    
     private func handleSceneEvent(_ body: Data) {
         guard let op = body.first, let connection else { return }
         switch op {
@@ -236,12 +308,12 @@ class GameScene: SKScene {
             break
         }
     }
-
+    
     private func announceIfBothReady() {
         guard !didAnnounceDuel, localSceneReady, remoteSceneReady,
               let connection else { return }
         didAnnounceDuel = true
-
+        
         let role = connection.isHost ? "HOST" : "PEER"
         let opponent: String
         if case let .connected(peerName) = connection.state {
@@ -250,24 +322,39 @@ class GameScene: SKScene {
             opponent = "opponent"
         }
         print("[\(role)] \(connection.myName) and \(opponent) both reached the scene.")
-
+        
         // Entering the game scene implies readiness — kick off the countdown.
         countdownController.pressReady()
     }
-
-    // MARK: - Touch Handling
     
-    func attemptShoot() {
+    // MARK: - Touch Handling
+        
+    private func handleTapForUIProgression() {
+        if case .matchOver = matchController.matchPhase {
+            onRequestReturnToMenu?()
+            return
+        }
+        if matchController.matchPhase == .awaitingContinue {
+            matchController.continueToNextRound()
+            return
+        }
+        // Intentionally no fire-handling here.
+        // Taps during the live duel window are ignored — only the volume trigger can fire.
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        handleTapForUIProgression()
+    }
+    
+    // MARK: - Shooting (volume trigger only)
+
+    private func attemptFire() {
         guard case .fire = countdownController.phase,
               !shotController.didFire,
               shotController.outcome == nil else {
             return
         }
         shotController.fire()
-    }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        attemptShoot()
     }
     
     // MARK: - Scene Setup Methods
@@ -353,7 +440,7 @@ class GameScene: SKScene {
         dimmingNode.zPosition = 10
         addChild(dimmingNode)
     }
-
+    
     private func setupCountdownLabel() {
         countdownLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
         countdownLabel.fontSize = 140
@@ -375,7 +462,7 @@ class GameScene: SKScene {
         bangNode.alpha = 0.0
         addChild(bangNode)
     }
-
+    
     private func setupCountdownNode() {
         countdownNode = SKSpriteNode()
         countdownNode.position = CGPoint(x: 0, y: 0)
@@ -383,7 +470,7 @@ class GameScene: SKScene {
         countdownNode.alpha = 0.0
         addChild(countdownNode)
     }
-
+    
     private func setupFireNode() {
         fireNode = SKSpriteNode(imageNamed: "fire")
         fireNode.texture?.filteringMode = .nearest
@@ -392,7 +479,7 @@ class GameScene: SKScene {
         fireNode.alpha = 0.0
         addChild(fireNode)
     }
-
+    
     private func setupResultNode() {
         resultNode = SKSpriteNode()
         resultNode.position = CGPoint(x: 0, y: 0)
@@ -520,4 +607,84 @@ class GameScene: SKScene {
             print("Failed to play get hit haptic: \(error.localizedDescription)")
         }
     }
+}
+
+#if DEBUG // used as helper for preview
+extension GameScene {
+    func previewApply(phase: CountdownController.Phase) {
+        handlePhaseChange(phase)
+    }
+    func previewApply(outcome: ShotController.Outcome) {
+        handleOutcome(outcome)
+    }
+    func previewApply(livesRemaining: Int) {
+        updateHearts(livesRemaining)
+    }
+}
+#endif
+
+#if DEBUG // preview with helper for didMove
+private struct GameScenePreviewHarness: View {
+    let configure: (GameScene) -> Void
+    
+    var body: some View {
+        GeometryReader { geo in
+            let scene: GameScene = {
+                let s = GameScene(size: geo.size)
+                s.scaleMode = .resizeFill
+                return s
+            }()
+            
+            SpriteView(scene: scene)
+                .ignoresSafeArea()
+                .onAppear {
+                    DispatchQueue.main.asyncAfter(deadline: .now() + 0.05) {
+                        configure(scene)
+                    }
+                }
+        }
+    }
+}
+#endif
+
+#Preview("Waiting") {
+    GameScenePreviewHarness { $0.previewApply(phase: .waiting) }
+}
+
+#Preview("Counting - 3") {
+    GameScenePreviewHarness { $0.previewApply(phase: .counting(3)) }
+}
+
+#Preview("Counting - 2") {
+    GameScenePreviewHarness { $0.previewApply(phase: .counting(2)) }
+}
+
+#Preview("Counting - 1") {
+    GameScenePreviewHarness { $0.previewApply(phase: .counting(1)) }
+}
+
+#Preview("Fire") {
+    GameScenePreviewHarness { $0.previewApply(phase: .fire) }
+}
+
+#Preview("Win") {
+    GameScenePreviewHarness { scene in
+        scene.previewApply(phase: .fire)
+        scene.previewApply(outcome: .winner)
+    }
+}
+
+#Preview("Lose") {
+    GameScenePreviewHarness { scene in
+        scene.previewApply(phase: .fire)
+        scene.previewApply(outcome: .loser)
+    }
+}
+
+#Preview("2 Lives Left") {
+    GameScenePreviewHarness { $0.previewApply(livesRemaining: 2) }
+}
+
+#Preview("Game Over (0 Lives)") {
+    GameScenePreviewHarness { $0.previewApply(livesRemaining: 0) }
 }

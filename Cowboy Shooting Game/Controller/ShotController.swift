@@ -45,6 +45,10 @@ final class ShotController: ObservableObject {
         static let resultWin: UInt8 = 1   // host → joiner: "you won"
         static let resultLose: UInt8 = 2  // host → joiner: "you lost"
     }
+    
+    // add timeout for draw
+    private var drawTimeoutTask: Task<Void, Never>?
+    private let drawGrace: Double = 1.0
 
     // MARK: - Wiring
 
@@ -57,6 +61,7 @@ final class ShotController: ObservableObject {
 
     /// Called by CountdownController the instant the firing window opens.
     func startRound(windowOpenNanos nanos: UInt64) {
+        drawTimeoutTask?.cancel(); drawTimeoutTask = nil
         windowOpenNanos = nanos
         myReaction = nil
         remoteReaction = nil
@@ -75,6 +80,7 @@ final class ShotController: ObservableObject {
 
         if connection.isHost {
             myReaction = reaction
+            armDrawTimeout()
             resolveIfPossible()
         } else {
             connection.sendEvent(channel: GameChannel.shot.rawValue,
@@ -83,6 +89,7 @@ final class ShotController: ObservableObject {
     }
 
     func reset() {
+        drawTimeoutTask?.cancel(); drawTimeoutTask = nil
         windowOpenNanos = nil
         myReaction = nil
         remoteReaction = nil
@@ -109,15 +116,40 @@ final class ShotController: ObservableObject {
     }
 
     // MARK: - Referee (host only)
+    
+    /// Called when the host first learns of a reaction. Gives the slower hand
+    /// `drawGrace` seconds; if it never draws, the one who did draw wins.
+    private func armDrawTimeout() {
+        guard let connection, connection.isHost, drawTimeoutTask == nil, !resolved else { return }
+        drawTimeoutTask = Task { [weak self] in
+            try? await Task.sleep(for: .seconds(self?.drawGrace ?? 1.0))
+            guard let self, !Task.isCancelled else { return }
+            self.resolveByTimeout()
+        }
+    }
 
     /// Once the host knows both reaction times, the smaller one wins.
     private func resolveIfPossible() {
         guard let connection, connection.isHost, !resolved,
               let mine = myReaction, let theirs = remoteReaction else { return }
+        finish(hostWins: mine <= theirs)
+    }
+    
+    private func resolveByTimeout() {
+        guard let connection, connection.isHost, !resolved else { return }
+        switch (myReaction, remoteReaction) {
+        case (.some(let mine), .some(let theirs)): finish(hostWins: mine <= theirs)
+        case (.some, .none):                        finish(hostWins: true)   // only host drew
+        case (.none, .some):                        finish(hostWins: false)  // only peer drew
+        case (.none, .none):                        break                    // nobody drew
+        }
+    }
+    
+    private func finish(hostWins: Bool) {
+        guard let connection, connection.isHost, !resolved else { return }
         resolved = true
-
-        if mine <= theirs {
-            // Host reacted at least as fast → host wins, joiner loses. (Ties → host.)
+        drawTimeoutTask?.cancel(); drawTimeoutTask = nil
+        if hostWins {
             connection.sendEvent(channel: GameChannel.shot.rawValue, body: Data([Opcode.resultLose]))
             settle(.winner)
         } else {
@@ -131,6 +163,5 @@ final class ShotController: ObservableObject {
     private func settle(_ outcome: Outcome) {
         resolved = true
         self.outcome = outcome
-        print(outcome == .winner ? "Winner" : "Loser")
     }
 }
