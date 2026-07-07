@@ -12,7 +12,7 @@ import SwiftUI
 extension Font {
     static var titleCSG: Font { .custom("WildWestPixel", size: 36)}
     static var headingCSG: Font { .custom("VCROSDMono", size: 24)}
-    static var headingCSG2: Font { .custom("VCROSDMono", size: 18)}
+    static var bodyCSG: Font { .custom("VCROSDMono", size: 17)}
 }
 
 
@@ -23,6 +23,7 @@ extension Color {
     static let ternaryCSG = Color(red: 93/255, green: 50/255, blue: 43/255)
 }
 
+// MARK: - Game Title
 struct TitleView : View {
     var body: some View {
         ZStack {

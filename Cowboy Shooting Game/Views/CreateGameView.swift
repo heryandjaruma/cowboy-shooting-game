@@ -20,26 +20,30 @@ struct CreateGameView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
+            Rectangle()
+                .fill(Color.black.opacity(0.5))
+                .ignoresSafeArea(edges: .all)
 
             VStack {
-                ScreenTopBar(title: "Create Game") {
+                ScreenTopBar(title: "CREATE GAME") {
                     connection.stopAll() // leaving the room — tear down here, not on disappear.
                     dismiss()
                 }
 
                 Spacer()
 
-                Image(systemName: "wifi")
-                    .font(.system(size: 170, weight: .bold))
-                    .foregroundStyle(.white)
+                Image(.wifi)
+                    .resizable()
+                    .scaledToFit()
+                    .frame(height: 180)
 
                 Spacer()
 
-                Text("Room created, waiting for a challenger")
-                    .font(.headingCSG2)
+                Text("Game created, waiting for a player.")
+                    .font(.headingCSG)
                     .foregroundStyle(.white)
                     .padding(.bottom, 30)
-            }
+            }.padding(.top,20)
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { connection.startHosting() }

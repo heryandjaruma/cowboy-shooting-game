@@ -22,10 +22,13 @@ struct ScreenTopBar: View {
                 .font(.headingCSG)
                 .foregroundColor(Color.ternaryCSG)
                 .padding()
-                .background (
-                    RoundedRectangle(cornerRadius:14)
-                        .stroke(Color.ternaryCSG, lineWidth: 4)
-                        .fill(Color.primaryCSG))
+                .background(
+                    Image(.button)
+                        .resizable(
+                            capInsets: EdgeInsets(top: 1, leading: 1, bottom: 1, trailing: 1),
+                            resizingMode: .stretch
+                        )
+                )
             Spacer()
         }
         .padding(.horizontal, 20)

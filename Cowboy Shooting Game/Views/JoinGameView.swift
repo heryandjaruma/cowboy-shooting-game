@@ -107,16 +107,20 @@ struct JoinGameView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
+            Rectangle()
+                .fill(Color.black.opacity(0.5))
+                .ignoresSafeArea(edges: .all)
 
             VStack(spacing: 20) {
-                ScreenTopBar(title: "Join Game") {
-                    controller.stop() // leaving the list — tear down here, not on disappear.
+                ScreenTopBar(title: "JOIN GAME") {
+                    controller.stop()
                     dismiss()
                 }
 
                 VStack(alignment: .leading, spacing: 12) {
                     Text("Game List")
                         .font(.headingCSG)
+                        .foregroundColor(Color.ternaryCSG)
 
                     CowboyScrollView {
                         VStack(spacing: 12) {
@@ -127,7 +131,8 @@ struct JoinGameView: View {
                                     Text(room.displayName)
                                         .frame(maxWidth:.infinity, alignment: .center)
                                 }
-                                .buttonStyle(.cowboy)
+                                .buttonStyle(.cowboyJoin)
+                                .padding(2)
                             }
                         }
                         .padding(.vertical, 4)
