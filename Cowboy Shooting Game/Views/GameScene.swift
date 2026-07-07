@@ -72,7 +72,8 @@ class GameScene: SKScene {
         
         triggerController.reactivate()
 
-        triggerController.onTrigger = { [weak self] _ in self?.attemptShoot()
+        triggerController.onTrigger = { [weak self] _ in
+            self?.attemptFire()
         }
     }
     
@@ -328,7 +329,7 @@ class GameScene: SKScene {
     
     // MARK: - Touch Handling
         
-    func attemptShoot() {
+    private func handleTapForUIProgression() {
         if case .matchOver = matchController.matchPhase {
             onRequestReturnToMenu?()
             return
@@ -337,16 +338,23 @@ class GameScene: SKScene {
             matchController.continueToNextRound()
             return
         }
+        // Intentionally no fire-handling here.
+        // Taps during the live duel window are ignored — only the volume trigger can fire.
+    }
+
+    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
+        handleTapForUIProgression()
+    }
+    
+    // MARK: - Shooting (volume trigger only)
+
+    private func attemptFire() {
         guard case .fire = countdownController.phase,
               !shotController.didFire,
               shotController.outcome == nil else {
             return
         }
         shotController.fire()
-    }
-
-    override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
-        attemptShoot()
     }
     
     // MARK: - Scene Setup Methods
