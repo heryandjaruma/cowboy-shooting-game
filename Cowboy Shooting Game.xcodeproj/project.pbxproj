@@ -7,11 +7,13 @@
 	objects = {
 
 /* Begin PBXBuildFile section */
+		50DF76942FFCCE4C0027EE33 /* Localizable.xcstrings in Resources */ = {isa = PBXBuildFile; fileRef = 50DF76932FFCCE4C0027EE33 /* Localizable.xcstrings */; };
 		B6C75CBB2FEBC6F100E0797A /* .gitignore in Resources */ = {isa = PBXBuildFile; fileRef = B6C75CBA2FEBC6EB00E0797A /* .gitignore */; };
 		B6C75CBD2FEBC77400E0797A /* Local.xcconfig.example in Resources */ = {isa = PBXBuildFile; fileRef = B6C75CBC2FEBC77300E0797A /* Local.xcconfig.example */; };
 /* End PBXBuildFile section */
 
 /* Begin PBXFileReference section */
+		50DF76932FFCCE4C0027EE33 /* Localizable.xcstrings */ = {isa = PBXFileReference; lastKnownFileType = text.json.xcstrings; path = Localizable.xcstrings; sourceTree = "<group>"; };
 		B6C75CAA2FEBC6B900E0797A /* Cowboy Shooting Game.app */ = {isa = PBXFileReference; explicitFileType = wrapper.application; includeInIndex = 0; path = "Cowboy Shooting Game.app"; sourceTree = BUILT_PRODUCTS_DIR; };
 		B6C75CBA2FEBC6EB00E0797A /* .gitignore */ = {isa = PBXFileReference; lastKnownFileType = text; path = .gitignore; sourceTree = "<group>"; };
 		B6C75CBC2FEBC77300E0797A /* Local.xcconfig.example */ = {isa = PBXFileReference; lastKnownFileType = text; path = Local.xcconfig.example; sourceTree = "<group>"; };
@@ -39,6 +41,7 @@
 		B6C75CA12FEBC6B900E0797A = {
 			isa = PBXGroup;
 			children = (
+				50DF76932FFCCE4C0027EE33 /* Localizable.xcstrings */,
 				B6C75CBC2FEBC77300E0797A /* Local.xcconfig.example */,
 				B6C75CBA2FEBC6EB00E0797A /* .gitignore */,
 				B6C75CAC2FEBC6B900E0797A /* Cowboy Shooting Game */,
@@ -100,6 +103,7 @@
 			knownRegions = (
 				en,
 				Base,
+				id,
 			);
 			mainGroup = B6C75CA12FEBC6B900E0797A;
 			minimizedProjectReferenceProxies = 1;
@@ -118,6 +122,7 @@
 			isa = PBXResourcesBuildPhase;
 			buildActionMask = 2147483647;
 			files = (
+				50DF76942FFCCE4C0027EE33 /* Localizable.xcstrings in Resources */,
 				B6C75CBB2FEBC6F100E0797A /* .gitignore in Resources */,
 				B6C75CBD2FEBC77400E0797A /* Local.xcconfig.example in Resources */,
 			);
@@ -196,6 +201,7 @@
 				ONLY_ACTIVE_ARCH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_ACTIVE_COMPILATION_CONDITIONS = "DEBUG $(inherited)";
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				SWIFT_OPTIMIZATION_LEVEL = "-Onone";
 			};
 			name = Debug;
@@ -253,6 +259,7 @@
 				MTL_FAST_MATH = YES;
 				SDKROOT = iphoneos;
 				SWIFT_COMPILATION_MODE = wholemodule;
+				SWIFT_EMIT_LOC_STRINGS = YES;
 				VALIDATE_PRODUCT = YES;
 			};
 			name = Release;

@@ -25,14 +25,17 @@ struct ConfirmationScreenView: View {
                 .resizable()
                 .scaledToFill()
                 .ignoresSafeArea()
-            
+            Rectangle()
+                .fill(Color.black.opacity(0.5))
+                .ignoresSafeArea(edges: .all)
+
             VStack {
                 ScreenTopBar(title: "GAME SET") {
                     connection.stopAll()
                     dismiss()
                 }
                 Spacer()
-            }
+            }.padding(.top, 20)
             
             // Duelists panel
             HStack(spacing: 24) {
@@ -52,7 +55,6 @@ struct ConfirmationScreenView: View {
             )
             .padding(.horizontal, 40)
             
-            // Ready button, bottom-right
             VStack {
                 Spacer()
                 HStack {
@@ -61,6 +63,7 @@ struct ConfirmationScreenView: View {
                         controller.pressReady()
                     } label: {
                         Text(controller.localReady ? "Waiting…" : "Ready")
+
                     }
                     .buttonStyle(.cowboyCompact)
                     .disabled(controller.localReady)
