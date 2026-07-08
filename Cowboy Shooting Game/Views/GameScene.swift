@@ -42,6 +42,7 @@ class GameScene: SKScene {
     // Hardware integration properties
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
+    private var tickPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
     
     // MARK: - Lifecycle
@@ -57,7 +58,7 @@ class GameScene: SKScene {
         
         setupBackground()
         setupGun()
-        setupPlayerUI()
+//        setupPlayerUI()
         setupHealthUI()
         setupDimmingLayer()
         setupCountdownLabel()
@@ -209,6 +210,7 @@ class GameScene: SKScene {
                 SKAction.scale(to: 0.69, duration: 0.12),
                 SKAction.scale(to: 0.42, duration: 0.08)
             ]))
+            playCountdownTickAudio()
             playCountdownTickHaptic()
 
         case .fire:
@@ -673,6 +675,21 @@ class GameScene: SKScene {
         }
     }
     
+    private func playCountdownTickAudio() {
+        guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else {
+            print("Could not find CountdownTick.m4a")
+            return
+        }
+        do {
+            tickPlayer = try AVAudioPlayer(contentsOf: url)
+            tickPlayer?.volume = 0.69
+            tickPlayer?.prepareToPlay()
+            tickPlayer?.play()
+        } catch {
+            print("Failed to play countdown tick audio: \(error.localizedDescription)")
+        }
+    }
+
     private func playGunshotAudio() {
         guard let soundAsset = NSDataAsset(name: "rayne-mixedgun") else {
             print("Could not find the audio asset in the catalog.")
