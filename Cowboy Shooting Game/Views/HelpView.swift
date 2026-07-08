@@ -22,10 +22,12 @@ struct HelpView: View {
             markdown: String(localized: resource),
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
         )) ?? AttributedString(String(localized: resource))
+        attributed.font = Font.bodyCSG
+        attributed.foregroundColor = Color.ternaryCSG.opacity(0.7)
 
         for run in attributed.runs where run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true {
             attributed[run.range].font = Font.bodyCSG
-            attributed[run.range].foregroundColor = Color.white
+            attributed[run.range].foregroundColor = Color.ternaryCSG.opacity(1.0)
         }
         return attributed
     }
