@@ -224,13 +224,24 @@ final class MusicManager: ObservableObject {
 
     // MARK: - Fade helpers
 
+    /// Update the currently-playing track's volume to the stored master volume.
+    /// Call from SettingsView.onChange so changes take effect immediately.
+    func applyMasterVolume() {
+        player?.volume = masterVolume
+    }
+
+    private var masterVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
+    }
+
     private func fadeIn(_ player: AVAudioPlayer, duration: TimeInterval = 0.8) {
+        let target = masterVolume
         let steps = 20
         let stepDuration = duration / Double(steps)
         var currentStep = 0
         Timer.scheduledTimer(withTimeInterval: stepDuration, repeats: true) { timer in
             currentStep += 1
-            player.volume = Float(currentStep) / Float(steps)
+            player.volume = target * Float(currentStep) / Float(steps)
             if currentStep >= steps { timer.invalidate() }
         }
     }

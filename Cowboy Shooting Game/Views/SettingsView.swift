@@ -115,6 +115,10 @@ struct SettingsView: View {
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = true
 
+    @AppStorage(AppSettings.masterVolumeKey)  private var masterVolume  = 1.0
+    @AppStorage(AppSettings.sfxVolumeKey)     private var sfxVolume     = 1.0
+    @AppStorage(AppSettings.gunshotVolumeKey) private var gunshotVolume = 1.0
+
     private let grayscaleOptions = ["OFF", "ON"]
 
     private var languageIndex: Binding<Int> {
@@ -141,30 +145,39 @@ struct SettingsView: View {
                 .fill(Color.black.opacity(0.5))
                 .ignoresSafeArea(edges: .all)
 
-            VStack(spacing: 20) {
+            VStack(spacing: 0) {
                 ScreenTopBar(title: "SETTINGS") {
                     dismiss()
                 }
+                .padding(.top, 20)
 
-                VStack(spacing: 16) {
-                    SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
-                    SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
+                        SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
 
-                    SettingSliderRow(
-                        label: "Gunshot Noise",
-                        value: Binding(
-                            get: { Double(triggerController.state.baselineTrigger) },
-                            set: { triggerController.updateBaseline(Float($0)) }
-                        ),
-                        range: 0.05...0.95
-                    )
+                        SettingSliderRow(
+                            label: "Trigger Level",
+                            value: Binding(
+                                get: { Double(triggerController.state.baselineTrigger) },
+                                set: { triggerController.updateBaseline(Float($0)) }
+                            ),
+                            range: 0.05...0.95
+                        )
+
+                        SettingSliderRow(label: "Master Volume",  value: $masterVolume)
+                        SettingSliderRow(label: "SFX Volume",     value: $sfxVolume)
+                        SettingSliderRow(label: "Gunshot Volume", value: $gunshotVolume)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 20)
                 }
-                .padding(.horizontal, 16)
-
-                Spacer()
-            }.padding(.top,20)
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: masterVolume) { _, _ in
+            MusicManager.shared.applyMasterVolume()
+        }
     }
 }
 
