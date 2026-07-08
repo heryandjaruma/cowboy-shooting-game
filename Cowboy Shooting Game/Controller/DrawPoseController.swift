@@ -47,11 +47,12 @@ final class DrawPoseController: ObservableObject {
     /// gate then lets every shot through so the game stays playable.
     private(set) var isAvailable = false
 
-    /// |gravity.y| at or above this is holstered: an end dipped ≥ ~37° below level.
-    private let holsterThreshold = 0.6
-    /// |gravity.y| at or below this is drawn: within ~25° of level. The gap up
-    /// to `holsterThreshold` is a dead band so the poses can't flicker.
-    private let drawnThreshold = 0.42
+    /// |gravity.y| at or above this is holstered: an end dipped ≥ ~44° below level.
+    private let holsterThreshold = 0.7
+    /// |gravity.y| at or below this is drawn: within ~35° of level. Kept
+    /// generous so a casual raise counts even if the wrist tips a bit high or
+    /// low. The gap up to `holsterThreshold` is a dead band so poses can't flicker.
+    private let drawnThreshold = 0.57
 
     private var roundActive = false
     private let motionManager = CMMotionManager()
