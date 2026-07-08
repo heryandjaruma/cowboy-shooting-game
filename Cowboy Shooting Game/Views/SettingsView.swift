@@ -8,7 +8,7 @@
 import SwiftUI
 
 private struct SettingRow: View {
-    let label: String
+    let label: LocalizedStringKey
     let options: [String]
     @Binding var selection: Int
     private var value: String {
@@ -75,7 +75,7 @@ private struct SettingRow: View {
 }
 
 private struct SettingSliderRow: View {
-    let label: String
+    let label: LocalizedStringKey
     @Binding var value: Double
     var range: ClosedRange<Double> = 0...1
 
