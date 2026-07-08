@@ -71,6 +71,9 @@ struct ConfirmationScreenView: View {
                     .padding(.bottom, 20)
                 }
             }
+            .onAppear {
+                MusicManager.shared.stop(fade: true)
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
         .onAppear { controller.activate() }
@@ -87,6 +90,9 @@ struct ConfirmationScreenView: View {
             GeometryReader { geometry in
                 SpriteView(scene: createGameScene(size: geometry.size)) // start a SpriteKit view
                     .ignoresSafeArea()
+                    .onAppear {
+                        MusicManager.shared.play(.gameplay)
+                    }
             }
         }
     }
