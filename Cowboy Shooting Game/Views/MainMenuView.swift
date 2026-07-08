@@ -14,6 +14,7 @@ struct MainMenuView: View {
     @AppStorage(GameConnectionManager.playerNameDefaultsKey) private var playerName = ""
     @State private var showNamePrompt = false
     @State private var nameDraft = ""
+    @State private var showDrawPoseTest = false
 
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
@@ -66,6 +67,16 @@ struct MainMenuView: View {
                     HStack {
                         Spacer()
                         HStack(spacing: 12) {
+                            #if DEBUG
+                            // Dev-only practice range for the draw pose gate.
+                            Button {
+                                showDrawPoseTest = true
+                            } label: {
+                                Text("🎯")
+                            }
+                            .buttonStyle(.cowboyIcon)
+                            #endif
+
                             Button {
                                 path.append(MenuDestination.helpGame)
                             } label: {
@@ -107,6 +118,9 @@ struct MainMenuView: View {
                 Button("Cancel", role: .cancel) {}
             } message: {
                 Text("What does the town call you, Slinger?")
+            }
+            .fullScreenCover(isPresented: $showDrawPoseTest) {
+                DrawPoseTestView()
             }
         }
     }

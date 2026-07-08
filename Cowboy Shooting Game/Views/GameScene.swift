@@ -15,10 +15,12 @@ class GameScene: SKScene {
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
     var matchController: MatchController = MatchController()
+    var drawPoseController: DrawPoseController = DrawPoseController()
     
     private var hearts: [SKSpriteNode] = []
     
     private var dimmingNode: SKSpriteNode!
+    private var holsterHintLabel: SKLabelNode!  // pose-gate coaching text
     private var countdownLabel: SKLabelNode!
     private var countdownNode: SKSpriteNode!  // num3 / num2 / num1 images
     private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
@@ -63,13 +65,15 @@ class GameScene: SKScene {
         setupFireNode()
         setupResultNode()
         setupBangNode()
-        
+        setupHolsterHintLabel()
+
         prepareHaptics()
         setupAudioSession()
-        
+
         observeControllers()
         setupNetworking()
-        
+
+        drawPoseController.start()
         triggerController.reactivate()
 
         triggerController.onTrigger = { [weak self] _ in
@@ -82,6 +86,7 @@ class GameScene: SKScene {
         super.willMove(from: view)
 
         triggerController.onTrigger = nil
+        drawPoseController.stop()
     }
     
     // MARK: - Controller Observation
@@ -121,9 +126,42 @@ class GameScene: SKScene {
                 }
             }
             .store(in: &cancellables)
+
+        // Pose gate. @Published emits on willSet, so hop through the main queue
+        // once to read the controller's fully-updated state in the handler.
+        drawPoseController.$pose
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshHolsterHint(phase: self.countdownController.phase)
+            }
+            .store(in: &cancellables)
+
+        drawPoseController.$isArmed
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshHolsterHint(phase: self.countdownController.phase)
+            }
+            .store(in: &cancellables)
     }
     
     private func handlePhaseChange(_ phase: CountdownController.Phase) {
+        switch phase {
+        case .notReady, .waiting:
+            drawPoseController.endRound()
+        case .counting:
+            break
+        case .fire:
+            // Judged at the exact window-open instant: out of the holster now
+            // is a false start and the player must re-holster to arm.
+            drawPoseController.beginRound()
+            playDrawSignalHaptic() // felt even with the phone held at the hip
+        }
+        refreshHolsterHint(phase: phase)
+
         switch phase {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
@@ -193,6 +231,7 @@ class GameScene: SKScene {
     
     private func handleOutcome(_ outcome: ShotController.Outcome) {
         // Stop any in-progress animations
+        hideHolsterHint()
         fireNode.removeAllActions();   fireNode.run(SKAction.fadeOut(withDuration: 0.15))
         countdownNode.removeAllActions(); countdownNode.alpha = 0.0
         countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
@@ -354,7 +393,26 @@ class GameScene: SKScene {
               shotController.outcome == nil else {
             return
         }
+        // Pose gate: the shot only counts from a raised gun after a clean
+        // (or corrected) holster start — see DrawPoseController.
+        guard drawPoseController.canFire else {
+            dryFire()
+            return
+        }
         shotController.fire()
+    }
+
+    /// Trigger pulled while not in a valid draw pose — the hammer just clicks.
+    private func dryFire() {
+        playDryFireHaptic()
+        // Nudge the FIRE prompt sideways so the blocked shot is visible too.
+        let shake = SKAction.sequence([
+            .moveBy(x: 12, y: 0, duration: 0.04),
+            .moveBy(x: -24, y: 0, duration: 0.06),
+            .moveBy(x: 12, y: 0, duration: 0.04),
+            .move(to: CGPoint(x: 0, y: 0), duration: 0.02)
+        ])
+        fireNode.run(shake, withKey: "dryFireShake")
     }
     
     // MARK: - Scene Setup Methods
@@ -487,6 +545,72 @@ class GameScene: SKScene {
         resultNode.alpha = 0.0
         addChild(resultNode)
     }
+
+    private func setupHolsterHintLabel() {
+        holsterHintLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
+        holsterHintLabel.fontSize = 26
+        holsterHintLabel.verticalAlignmentMode = .center
+        holsterHintLabel.horizontalAlignmentMode = .center
+        holsterHintLabel.position = CGPoint(x: 0, y: -self.size.height / 2 + 60)
+        holsterHintLabel.zPosition = 11
+        holsterHintLabel.alpha = 0.0
+        addChild(holsterHintLabel)
+    }
+
+    // MARK: - Holster hint (pose-gate coaching)
+
+    /// Bottom-of-screen coaching: holster guidance while the countdown runs,
+    /// a false-start warning during the firing window, nothing once the round
+    /// is decided or when this device can't sense motion.
+    private func refreshHolsterHint(phase: CountdownController.Phase) {
+        guard drawPoseController.isAvailable,
+              shotController.outcome == nil, !shotController.didFire,
+              matchController.matchPhase == .playing else {
+            hideHolsterHint()
+            return
+        }
+        switch phase {
+        case .notReady:
+            hideHolsterHint()
+        case .waiting, .counting:
+            if drawPoseController.pose == .holstered {
+                showHolsterHint("HOLSTERED... STEADY",
+                                color: SKColor(red: 0.45, green: 0.85, blue: 0.45, alpha: 1.0),
+                                pulse: false)
+            } else {
+                showHolsterHint("HOLSTER! TIP YOUR GUN DOWN",
+                                color: .orange, pulse: true)
+            }
+        case .fire:
+            if drawPoseController.isArmed {
+                hideHolsterHint()
+            } else {
+                showHolsterHint("TOO SOON! RE-HOLSTER!",
+                                color: .red, pulse: true)
+            }
+        }
+    }
+
+    private func showHolsterHint(_ text: String, color: SKColor, pulse: Bool) {
+        // Pose updates stream in continuously; don't restart the animation
+        // unless the message actually changed.
+        guard holsterHintLabel.text != text || holsterHintLabel.alpha == 0 else { return }
+        holsterHintLabel.removeAllActions()
+        holsterHintLabel.text = text
+        holsterHintLabel.fontColor = color
+        holsterHintLabel.alpha = 1.0
+        if pulse {
+            holsterHintLabel.run(.repeatForever(.sequence([
+                .fadeAlpha(to: 0.35, duration: 0.45),
+                .fadeAlpha(to: 1.0, duration: 0.45)
+            ])))
+        }
+    }
+
+    private func hideHolsterHint() {
+        holsterHintLabel.removeAllActions()
+        holsterHintLabel.alpha = 0.0
+    }
     
     // MARK: - Hardware Integration (Audio, Flashlight, Haptics)
     
@@ -591,6 +715,43 @@ class GameScene: SKScene {
         }
     }
     
+    /// Sharp little click for a trigger pull outside a valid draw pose.
+    private func playDryFireHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play dry fire haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Buzz when the firing window opens, so the signal is felt even while the
+    /// phone is holstered at the hip rather than being watched.
+    private func playDrawSignalHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play draw signal haptic: \(error.localizedDescription)")
+        }
+    }
+
     private func playGetHitHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
         
