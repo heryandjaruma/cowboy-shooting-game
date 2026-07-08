@@ -43,6 +43,7 @@ class GameScene: SKScene {
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
     private var tickPlayer: AVAudioPlayer?
+    private var jammedPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
     
     // MARK: - Lifecycle
@@ -408,6 +409,7 @@ class GameScene: SKScene {
 
     /// Trigger pulled while not in a valid draw pose — the hammer just clicks.
     private func dryFire() {
+        playGunJammedAudio()
         playDryFireHaptic()
         // Nudge the FIRE prompt sideways so the blocked shot is visible too.
         let shake = SKAction.sequence([
@@ -700,6 +702,21 @@ class GameScene: SKScene {
             tickPlayer?.play()
         } catch {
             print("Failed to play countdown tick audio: \(error.localizedDescription)")
+        }
+    }
+
+    private func playGunJammedAudio() {
+        guard let url = Bundle.main.url(forResource: "GunJammed", withExtension: "m4a") else {
+            print("Could not find GunJammed.m4a")
+            return
+        }
+        do {
+            jammedPlayer = try AVAudioPlayer(contentsOf: url)
+            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.prepareToPlay()
+            jammedPlayer?.play()
+        } catch {
+            print("Failed to play gun jammed audio: \(error.localizedDescription)")
         }
     }
 

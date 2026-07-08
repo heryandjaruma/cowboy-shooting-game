@@ -157,7 +157,7 @@ struct SettingsView: View {
                         SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
 
                         SettingSliderRow(
-                            label: "Trigger Level",
+                            label: "Master",
                             value: Binding(
                                 get: { Double(triggerController.state.baselineTrigger) },
                                 set: { triggerController.updateBaseline(Float($0)) }
@@ -165,9 +165,9 @@ struct SettingsView: View {
                             range: 0.05...0.95
                         )
 
-                        SettingSliderRow(label: "Master Volume",  value: $masterVolume)
-                        SettingSliderRow(label: "SFX Volume",     value: $sfxVolume)
-                        SettingSliderRow(label: "Gunshot Volume", value: $gunshotVolume)
+                        SettingSliderRow(label: "Music",   value: $masterVolume)
+                        SettingSliderRow(label: "SFX",     value: $sfxVolume)
+                        SettingSliderRow(label: "Gunshot", value: $gunshotVolume)
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 20)

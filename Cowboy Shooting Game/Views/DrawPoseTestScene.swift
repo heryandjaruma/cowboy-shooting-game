@@ -65,6 +65,8 @@ class DrawPoseTestScene: SKScene {
 
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
+    private var tickPlayer: AVAudioPlayer?
+    private var jammedPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
 
     /// Test-only tilt feed for the readout label, so the production
@@ -108,6 +110,7 @@ class DrawPoseTestScene: SKScene {
         super.willMove(from: view)
 
         triggerController.onTrigger = nil
+        triggerController.disable()
         countdownTask?.cancel()
         drawPoseController.stop()
         tiltMotion.stopDeviceMotionUpdates()
@@ -189,6 +192,7 @@ class DrawPoseTestScene: SKScene {
     /// Trigger pulled while not in a valid draw pose — the hammer just clicks.
     private func dryFire() {
         dryFireCount += 1
+        playGunJammedAudio()
         playDryFireHaptic()
         let shake = SKAction.sequence([
             .moveBy(x: 12, y: 0, duration: 0.04),
@@ -237,6 +241,8 @@ class DrawPoseTestScene: SKScene {
                 SKAction.scale(to: 0.69, duration: 0.12),
                 SKAction.scale(to: 0.42, duration: 0.08)
             ]))
+            playCountdownTickAudio()
+            playCountdownTickHaptic()
 
         case .fire:
             // Judged at the exact window-open instant, same rule as the duel.
@@ -530,6 +536,13 @@ class DrawPoseTestScene: SKScene {
         }
     }
 
+    private var masterVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
+    }
+    private var sfxVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.sfxVolumeKey) as? Double ?? 1.0)
+    }
+
     private func playGunshotAudio() {
         guard let soundAsset = NSDataAsset(name: "rayne-mixedgun") else {
             print("Could not find the audio asset in the catalog.")
@@ -537,10 +550,35 @@ class DrawPoseTestScene: SKScene {
         }
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
+            audioPlayer?.volume = masterVolume * Float(UserDefaults.standard.object(forKey: AppSettings.gunshotVolumeKey) as? Double ?? 1.0)
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {
             print("Failed to play audio: \(error.localizedDescription)")
+        }
+    }
+
+    private func playCountdownTickAudio() {
+        guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else { return }
+        do {
+            tickPlayer = try AVAudioPlayer(contentsOf: url)
+            tickPlayer?.volume = masterVolume * sfxVolume
+            tickPlayer?.prepareToPlay()
+            tickPlayer?.play()
+        } catch {
+            print("Failed to play countdown tick: \(error.localizedDescription)")
+        }
+    }
+
+    private func playGunJammedAudio() {
+        guard let url = Bundle.main.url(forResource: "GunJammed", withExtension: "m4a") else { return }
+        do {
+            jammedPlayer = try AVAudioPlayer(contentsOf: url)
+            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.prepareToPlay()
+            jammedPlayer?.play()
+        } catch {
+            print("Failed to play gun jammed: \(error.localizedDescription)")
         }
     }
 
@@ -556,6 +594,11 @@ class DrawPoseTestScene: SKScene {
 
     private func playGunshotHaptic() {
         playTransientHaptic(intensity: 1.0, sharpness: 1.0)
+    }
+
+    /// Short firm tick on each countdown number (3, 2, 1).
+    private func playCountdownTickHaptic() {
+        playTransientHaptic(intensity: 0.7, sharpness: 0.6)
     }
 
     /// Sharp little click for a trigger pull outside a valid draw pose.
