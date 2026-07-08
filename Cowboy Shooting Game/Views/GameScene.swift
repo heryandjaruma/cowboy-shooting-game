@@ -209,7 +209,8 @@ class GameScene: SKScene {
                 SKAction.scale(to: 0.69, duration: 0.12),
                 SKAction.scale(to: 0.42, duration: 0.08)
             ]))
-            
+            playCountdownTickHaptic()
+
         case .fire:
             // Lift the dimming overlay and hide number nodes
             countdownLabel.removeAllActions(); countdownLabel.run(SKAction.fadeOut(withDuration: 0.15))
@@ -749,6 +750,24 @@ class GameScene: SKScene {
             try player?.start(atTime: 0)
         } catch {
             print("Failed to play draw signal haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Short firm tick on each countdown number (3, 2, 1).
+    private func playCountdownTickHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play countdown tick haptic: \(error.localizedDescription)")
         }
     }
 
