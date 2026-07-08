@@ -3,7 +3,7 @@ import SpriteKit
 import GameplayKit
 import AVFoundation
 import CoreHaptics
-import UIKit // Required for NSDataAsset
+import UIKit
 import Combine
 
 class GameScene: SKScene {

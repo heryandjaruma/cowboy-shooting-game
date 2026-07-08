@@ -48,7 +48,10 @@ final class TriggerController: ObservableObject {
     private init() {
         try? audioSession.setCategory(.playback, options: [.duckOthers])
         try? audioSession.setActive(true)
- 
+
+        let currentVolume = audioSession.outputVolume
+        state.baselineTrigger = min(max(currentVolume, 0.05), 0.95)
+
         startSilentPlayback()
         
         DispatchQueue.main.async {
@@ -57,9 +60,15 @@ final class TriggerController: ObservableObject {
  
         observation = audioSession.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
             guard let self = self else { return }
-            // Outside gameplay let the OS handle volume normally.
-            guard self.isEnabled else { return }
             guard let oldVal = change.oldValue, let newVal = change.newValue, oldVal != newVal else { return }
+
+            // Outside gameplay, keep the Master slider in sync with hardware volume buttons.
+            guard self.isEnabled else {
+                DispatchQueue.main.async {
+                    self.state.baselineTrigger = min(max(newVal, 0.05), 0.95)
+                }
+                return
+            }
 
             DispatchQueue.main.async {
                 if abs(newVal - self.state.baselineTrigger) < 0.001 {
