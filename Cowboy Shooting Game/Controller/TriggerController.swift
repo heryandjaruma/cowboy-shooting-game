@@ -40,6 +40,10 @@ final class TriggerController: ObservableObject {
  
     private var lastSliderUpdateTime: Date = .distantPast
     private let throttleInterval: TimeInterval = 0.05
+
+    // When false the volume button behaves normally (lobby, menus).
+    // When true (gameplay) the button is intercepted as a game trigger.
+    private var isEnabled = false
  
     private init() {
         try? audioSession.setCategory(.playback, options: [.duckOthers])
@@ -53,19 +57,21 @@ final class TriggerController: ObservableObject {
  
         observation = audioSession.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
             guard let self = self else { return }
+            // Outside gameplay let the OS handle volume normally.
+            guard self.isEnabled else { return }
             guard let oldVal = change.oldValue, let newVal = change.newValue, oldVal != newVal else { return }
- 
+
             DispatchQueue.main.async {
                 if abs(newVal - self.state.baselineTrigger) < 0.001 {
                     return
                 }
- 
+
                 let direction: TriggerDirection = newVal > oldVal ? .up : .down
- 
+
                 self.triggerVisualFeedback(message: direction == .up ? "Trigger UP Hit" : "Trigger DOWN Hit")
                 self.delegate?.triggerController(self, didDetectDirection: direction)
                 self.onTrigger?(direction)
- 
+
                 // Tombol melewati throttle supaya loop hardware langsung ter-reset instan
                 self.pinTrigger(to: self.state.baselineTrigger, forceImmediate: true)
             }
@@ -149,16 +155,26 @@ final class TriggerController: ObservableObject {
         pinTrigger(to: value, forceImmediate: false)
     }
  
+    /// Enable trigger interception — call when entering the game scene.
     func reactivate() {
+        isEnabled = true
         try? audioSession.setActive(true)
         if !silentEngine.isRunning { try? silentEngine.start() }
         if !silentPlayer.isPlaying { silentPlayer.play() }
- 
+
         if hiddenTriggerView?.superview == nil {
             setupHiddenTriggerView()
         } else {
             pinTrigger(to: state.baselineTrigger, forceImmediate: true)
         }
+    }
+
+    /// Disable trigger interception — call when leaving the game scene so the
+    /// volume button restores normal system-volume behaviour in the lobby/menus.
+    func disable() {
+        isEnabled = false
+        hiddenTriggerView?.removeFromSuperview()
+        systemSlider = nil
     }
  
     private func triggerVisualFeedback(message: String) {

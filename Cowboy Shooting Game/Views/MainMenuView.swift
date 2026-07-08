@@ -123,6 +123,10 @@ struct MainMenuView: View {
                 DrawPoseTestView()
             }
         }
+        .onAppear {
+            MusicManager.shared.attach(to: connection)
+            MusicManager.shared.play(.lobby)
+        }
     }
 }
 

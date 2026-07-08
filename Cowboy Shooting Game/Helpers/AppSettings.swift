@@ -19,4 +19,9 @@ enum AppSettings {
     static var languageNames: [String] { languages.map(\.name) }
     static var languageCodes: [String] { languages.map(\.code) }
     static var defaultLanguageCode: String { languageCodes.first ?? "en" }
+
+    // Volume controls — stored in UserDefaults, default 1.0 (full).
+    static let masterVolumeKey  = "masterVolume"
+    static let sfxVolumeKey     = "sfxVolume"
+    static let gunshotVolumeKey = "gunshotVolume"
 }
