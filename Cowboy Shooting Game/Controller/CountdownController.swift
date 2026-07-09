@@ -144,6 +144,11 @@ final class CountdownController: ObservableObject {
     /// so both devices tick and open the window together.
     private func scheduleCountdown(openHostNanos: UInt64, finalHold: Double) {
         guard let connection else { return }
+        // This round's ready pair is consumed. Clearing here (not at reset time)
+        // is what prevents a stale remoteReady from a finished round auto-starting
+        // the next one while the peer is still on "tap to continue".
+        localReady = false
+        remoteReady = false
         let open = connection.localUptime(forHostNanos: openHostNanos)
         let show1 = open &- nanos(finalHold)
         let show2 = show1 &- nanos(tickSeconds)

@@ -25,6 +25,7 @@ class GameScene: SKScene {
     private var countdownNode: SKSpriteNode!  // num3 / num2 / num1 images
     private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
     private var resultNode: SKSpriteNode!      // "win" / "lose" result image
+    private var matchSummaryLabel: SKLabelNode! // final lives tally under victory/game over
     private var bangNode: SKSpriteNode!        // shot-effect image
     
     private var localSceneReady = false
@@ -42,6 +43,8 @@ class GameScene: SKScene {
     // Hardware integration properties
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
+    private var tickPlayer: AVAudioPlayer?
+    private var jammedPlayer: AVAudioPlayer?
     private var isFiringFlashlight = false
     
     // MARK: - Lifecycle
@@ -57,13 +60,14 @@ class GameScene: SKScene {
         
         setupBackground()
         setupGun()
-        setupPlayerUI()
+//        setupPlayerUI()
         setupHealthUI()
         setupDimmingLayer()
         setupCountdownLabel()
         setupCountdownNode()
         setupFireNode()
         setupResultNode()
+        setupMatchSummaryLabel()
         setupBangNode()
         setupHolsterHintLabel()
 
@@ -86,6 +90,7 @@ class GameScene: SKScene {
         super.willMove(from: view)
 
         triggerController.onTrigger = nil
+        triggerController.disable()
         drawPoseController.stop()
     }
     
@@ -209,7 +214,9 @@ class GameScene: SKScene {
                 SKAction.scale(to: 0.69, duration: 0.12),
                 SKAction.scale(to: 0.42, duration: 0.08)
             ]))
-            
+            playCountdownTickAudio()
+            playCountdownTickHaptic()
+
         case .fire:
             // Lift the dimming overlay and hide number nodes
             countdownLabel.removeAllActions(); countdownLabel.run(SKAction.fadeOut(withDuration: 0.15))
@@ -280,7 +287,10 @@ class GameScene: SKScene {
             SKAction.scale(to: 0.69, duration: 0.15),
             SKAction.scale(to: 0.42, duration: 0.10)
         ]))
-        
+
+        matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
+        matchSummaryLabel.alpha = 1.0
+
         showReturnToMenuPrompt()
     }
     
@@ -404,6 +414,7 @@ class GameScene: SKScene {
 
     /// Trigger pulled while not in a valid draw pose — the hammer just clicks.
     private func dryFire() {
+        playGunJammedAudio()
         playDryFireHaptic()
         // Nudge the FIRE prompt sideways so the blocked shot is visible too.
         let shake = SKAction.sequence([
@@ -546,6 +557,18 @@ class GameScene: SKScene {
         addChild(resultNode)
     }
 
+    private func setupMatchSummaryLabel() {
+        matchSummaryLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
+        matchSummaryLabel.fontSize = 28
+        matchSummaryLabel.fontColor = .white
+        matchSummaryLabel.verticalAlignmentMode = .center
+        matchSummaryLabel.horizontalAlignmentMode = .center
+        matchSummaryLabel.position = CGPoint(x: 0, y: -210)  // between the result image and the return prompt
+        matchSummaryLabel.zPosition = 13
+        matchSummaryLabel.alpha = 0.0
+        addChild(matchSummaryLabel)
+    }
+
     private func setupHolsterHintLabel() {
         holsterHintLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
         holsterHintLabel.fontSize = 26
@@ -672,14 +695,57 @@ class GameScene: SKScene {
         }
     }
     
+    // MARK: - Volume helpers
+
+    private var masterVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
+    }
+    private var sfxVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.sfxVolumeKey) as? Double ?? 1.0)
+    }
+    private var gunshotVolume: Float {
+        Float(UserDefaults.standard.object(forKey: AppSettings.gunshotVolumeKey) as? Double ?? 1.0)
+    }
+
+    private func playCountdownTickAudio() {
+        guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else {
+            print("Could not find CountdownTick.m4a")
+            return
+        }
+        do {
+            tickPlayer = try AVAudioPlayer(contentsOf: url)
+            tickPlayer?.volume = masterVolume * sfxVolume
+            tickPlayer?.prepareToPlay()
+            tickPlayer?.play()
+        } catch {
+            print("Failed to play countdown tick audio: \(error.localizedDescription)")
+        }
+    }
+
+    private func playGunJammedAudio() {
+        guard let url = Bundle.main.url(forResource: "GunJammed", withExtension: "m4a") else {
+            print("Could not find GunJammed.m4a")
+            return
+        }
+        do {
+            jammedPlayer = try AVAudioPlayer(contentsOf: url)
+            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.prepareToPlay()
+            jammedPlayer?.play()
+        } catch {
+            print("Failed to play gun jammed audio: \(error.localizedDescription)")
+        }
+    }
+
     private func playGunshotAudio() {
         guard let soundAsset = NSDataAsset(name: "rayne-mixedgun") else {
             print("Could not find the audio asset in the catalog.")
             return
         }
-        
+
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
+            audioPlayer?.volume = masterVolume * gunshotVolume
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {
@@ -749,6 +815,24 @@ class GameScene: SKScene {
             try player?.start(atTime: 0)
         } catch {
             print("Failed to play draw signal haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Short firm tick on each countdown number (3, 2, 1).
+    private func playCountdownTickHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play countdown tick haptic: \(error.localizedDescription)")
         }
     }
 
