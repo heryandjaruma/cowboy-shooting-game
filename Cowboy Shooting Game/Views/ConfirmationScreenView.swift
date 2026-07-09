@@ -13,10 +13,24 @@ struct ConfirmationScreenView: View {
     @StateObject private var controller: ConfirmationController
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToGame = false
-    
-    init(connection: GameConnectionManager) {
+    @State private var showConnectionLostAlert = false
+
+    /// Unwinds past the create/join screen back to the main menu (set by the
+    /// presenting view). Used when the connection drops mid-duel.
+    private let onReturnToMenu: () -> Void
+
+    /// Keeps a single GameScene alive across body re-evaluations. Building the
+    /// scene inline in the cover would silently restart the duel every time a
+    /// published value (e.g. connection.state) changes mid-match.
+    private final class SceneHolder {
+        var scene: GameScene?
+    }
+    @State private var sceneHolder = SceneHolder()
+
+    init(connection: GameConnectionManager, onReturnToMenu: @escaping () -> Void = {}) {
         _connection = ObservedObject(wrappedValue: connection)
         _controller = StateObject(wrappedValue: ConfirmationController(connection: connection))
+        self.onReturnToMenu = onReturnToMenu
     }
     
     var body: some View {
@@ -81,18 +95,35 @@ struct ConfirmationScreenView: View {
             if ready { navigateToGame = true }
         }
         .onChange(of: connection.state) { _, newState in
-            // Opponent left before the duel — fall back to the previous screen.
-            if case .connected = newState {} else if !navigateToGame {
+            if case .connected = newState { return }
+            if navigateToGame {
+                // Mid-duel drop: tell the player, then send them to the main menu.
+                // If the match already ended (the opponent tapping "return to menu"
+                // also closes the connection), the result screen is the exit instead.
+                guard !showConnectionLostAlert else { return }
+                if case .matchOver = sceneHolder.scene?.matchController.matchPhase { return }
+                connection.stopAll() // a disconnected host would otherwise re-advertise mid-game
+                showConnectionLostAlert = true
+            } else {
+                // Opponent left before the duel — fall back to the previous screen.
                 dismiss()
             }
         }
-        .fullScreenCover(isPresented: $navigateToGame) {
+        .fullScreenCover(isPresented: $navigateToGame, onDismiss: { sceneHolder.scene = nil }) {
             GeometryReader { geometry in
-                SpriteView(scene: createGameScene(size: geometry.size)) // start a SpriteKit view
+                SpriteView(scene: gameScene(size: geometry.size)) // start a SpriteKit view
                     .ignoresSafeArea()
                     .onAppear {
                         MusicManager.shared.play(.gameplay)
                     }
+            }
+            .alert("Connection Lost", isPresented: $showConnectionLostAlert) {
+                Button("Back to Menu") {
+                    navigateToGame = false
+                    onReturnToMenu()
+                }
+            } message: {
+                Text("The connection to your opponent was lost.")
             }
         }
     }
@@ -123,8 +154,9 @@ struct ConfirmationScreenView: View {
             )
     }
     
-    // init a game scene
-    private func createGameScene(size: CGSize) -> SKScene {
+    // init a game scene (once per match — see SceneHolder)
+    private func gameScene(size: CGSize) -> SKScene {
+        if let scene = sceneHolder.scene { return scene }
         let scene = GameScene(size: size)
         scene.scaleMode = .resizeFill
         scene.connection = connection
@@ -132,6 +164,7 @@ struct ConfirmationScreenView: View {
             connection?.stopAll()
             dismiss()
         }
+        sceneHolder.scene = scene
         return scene
     }
 }
