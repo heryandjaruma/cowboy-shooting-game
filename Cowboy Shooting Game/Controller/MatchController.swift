@@ -71,7 +71,7 @@ final class MatchController: ObservableObject {
             connection.sendEvent(channel: GameChannel.life.rawValue,
                                  body: Data([Opcode.matchOver, joinerWon ? 1 : 0,
                                              UInt8(hostLives), UInt8(joinerLives)]))
-            scheduleFinish { self.matchPhase = .matchOver(won: !joinerWon) }
+            scheduleFinish { self.finishMatch(won: !joinerWon) }
         } else {
             connection.sendEvent(channel: GameChannel.life.rawValue,
                                  body: Data([Opcode.continueRound, UInt8(hostLives), UInt8(joinerLives)]))
@@ -92,7 +92,7 @@ final class MatchController: ObservableObject {
             opponentLives = Int(body[2])    // host's lives
             myLives = Int(body[3])          // joiner's own lives
             scheduleFinish {
-                self.matchPhase = .matchOver(won: joinerWon)
+                self.finishMatch(won: joinerWon)
             }
         case Opcode.continueRound:
             guard body.count > 2 else { return }
@@ -132,6 +132,17 @@ final class MatchController: ObservableObject {
     }
     
     private func scheduleFinish(_ apply: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: apply)
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            apply()
+        }
+    }
+
+    /// Pass wins here
+    private func finishMatch(won: Bool) {
+        matchPhase = .matchOver(won: won)
+        if won {
+            GameCenterManager.shared.reportWin()
+        }
     }
 }

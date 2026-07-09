@@ -1020,7 +1020,6 @@ private struct GameScenePreviewHarness: View {
         }
     }
 }
-#endif
 
 #Preview("Waiting") {
     GameScenePreviewHarness { $0.previewApply(phase: .waiting) }
@@ -1063,3 +1062,4 @@ private struct GameScenePreviewHarness: View {
 #Preview("Game Over (0 Lives)") {
     GameScenePreviewHarness { $0.previewApply(livesRemaining: 0) }
 }
+#endif
