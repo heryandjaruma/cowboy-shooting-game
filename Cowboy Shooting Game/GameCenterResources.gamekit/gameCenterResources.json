@@ -12,6 +12,14 @@
           "locale" : "id",
           "localID" : "LocalWinCounts-id",
           "name" : "Kemenangan"
+        },
+        {
+          "formatterOverride" : "INTEGER",
+          "formatterSuffix" : "Wins",
+          "formatterSuffixSingular" : "Win",
+          "locale" : "en-US",
+          "localID" : "LocalWinCounts-en-US",
+          "name" : "Victories"
         }
       ]
     },

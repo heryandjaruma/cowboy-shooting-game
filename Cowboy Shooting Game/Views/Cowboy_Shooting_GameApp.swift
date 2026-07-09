@@ -54,7 +54,7 @@ final class GameCenterManager: ObservableObject {
     var authViewController: UIViewController?
 
     /// Matches `vendorIdentifier` in GameCenterResources.gamekit — the leaderboard's ID.
-    private static let leaderboardID = "LocalWinCounts"
+    static let leaderboardID = "LocalWinCounts"
     /// Persistent cumulative win tally, so wins survive relaunches and are never lost
     /// while the player is signed out (they get backfilled on the next submit).
     private static let winCountKey = "gameCenterWinCount"
@@ -107,10 +107,40 @@ final class GameCenterManager: ObservableObject {
 
 struct GameCenterAuthView: UIViewControllerRepresentable {
     let viewController: UIViewController
-    
+
     func makeUIViewController(context: Context) -> UIViewController {
         return viewController
     }
-    
+
     func updateUIViewController(_ uiViewController: UIViewController, context: Context){}
+}
+
+/// Presents the native Game Center dashboard opened straight to our leaderboard.
+/// The Done button is wired through the delegate to `onFinish` so SwiftUI can dismiss.
+struct GameCenterDashboardView: UIViewControllerRepresentable {
+    var leaderboardID: String = GameCenterManager.leaderboardID
+    let onFinish: () -> Void
+
+    func makeUIViewController(context: Context) -> GKGameCenterViewController {
+        let viewController = GKGameCenterViewController(
+            leaderboardID: leaderboardID,
+            playerScope: .global,
+            timeScope: .allTime
+        )
+        viewController.gameCenterDelegate = context.coordinator
+        return viewController
+    }
+
+    func updateUIViewController(_ uiViewController: GKGameCenterViewController, context: Context) {}
+
+    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
+
+    final class Coordinator: NSObject, GKGameCenterControllerDelegate {
+        let onFinish: () -> Void
+        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
+
+        func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
+            onFinish()
+        }
+    }
 }
