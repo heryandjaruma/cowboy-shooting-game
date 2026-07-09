@@ -41,7 +41,7 @@ private struct WelcomeCard: View {
                 .ignoresSafeArea()
 
             VStack(spacing: 24) {
-                Text("Welcome to the duel. Shoot fast and stay alive to win. Lose 3 lives? Game over.")
+                Text("Welcome, Cowboy. Only one rule in these parts, the quickest draw win. You've got 3 shots to win. Make 'em count.")
                     .font(.bodyCSG)
                     .foregroundColor(Color.ternaryCSG)
                     .multilineTextAlignment(.center)
