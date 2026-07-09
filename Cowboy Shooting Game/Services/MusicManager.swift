@@ -11,12 +11,14 @@ import Combine
 enum MusicTrack: String {
     case lobby = "MusicLobby"
     case gameplay = "MusicGameplay"
+    case gameOver = "MusicGameOver"
 
     // Compact wire ID used in the audio sync message (1 byte).
     var id: UInt8 {
         switch self {
         case .lobby:    return 0
         case .gameplay: return 1
+        case .gameOver: return 2
         }
     }
 
@@ -24,6 +26,7 @@ enum MusicTrack: String {
         switch id {
         case 0: return .lobby
         case 1: return .gameplay
+        case 2: return .gameOver
         default: return nil
         }
     }

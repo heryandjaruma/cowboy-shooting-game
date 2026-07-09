@@ -45,6 +45,9 @@ class GameScene: SKScene {
     private var audioPlayer: AVAudioPlayer?
     private var tickPlayer: AVAudioPlayer?
     private var jammedPlayer: AVAudioPlayer?
+    private var voicePlayer: AVAudioPlayer?       // announcer lines — one channel, a new line replaces the old
+    private var firePromptPlayer: AVAudioPlayer?  // FireSFX at window open
+    private var voiceCompletionWorkItem: DispatchWorkItem?
     private var isFiringFlashlight = false
     
     // MARK: - Lifecycle
@@ -89,6 +92,8 @@ class GameScene: SKScene {
     override func willMove(from view: SKView) {
         super.willMove(from: view)
 
+        voiceCompletionWorkItem?.cancel()
+        voiceCompletionWorkItem = nil
         triggerController.onTrigger = nil
         triggerController.disable()
         drawPoseController.stop()
@@ -163,6 +168,7 @@ class GameScene: SKScene {
             // Judged at the exact window-open instant: out of the holster now
             // is a false start and the player must re-holster to arm.
             drawPoseController.beginRound()
+            playFirePromptAudio()
             playDrawSignalHaptic() // felt even with the phone held at the hip
         }
         refreshHolsterHint(phase: phase)
@@ -244,8 +250,11 @@ class GameScene: SKScene {
         resultNode.size = overlaySize(for: resultTex, height: 110)
         popIn(resultNode)
 
+        playVoiceLine(outcome == .winner ? "BullseyeSFX" : "OutdrawnSFX")
         if outcome == .loser {
             playGetHitHaptic()
+        } else {
+            playRoundWonHaptic()
         }
     }
     
@@ -261,6 +270,11 @@ class GameScene: SKScene {
         resultNode.texture = tex
         resultNode.size = overlaySize(for: tex, height: 170)
         popIn(resultNode)
+
+        // Verdict call over the game-over music bed. The music rides the Music
+        // slider and the host's sync heartbeat keeps both devices aligned.
+        playVoiceLine(won ? "VictorySFX" : "GameOverSFX")
+        MusicManager.shared.play(.gameOver)
 
         // matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
         // matchSummaryLabel.alpha = 1.0
@@ -377,9 +391,15 @@ class GameScene: SKScene {
             opponent = "opponent"
         }
         print("[\(role)] \(connection.myName) and \(opponent) both reached the scene.")
-        
-        // Entering the game scene implies readiness — kick off the countdown.
-        countdownController.pressReady()
+
+        // Entering the game scene implies readiness — but the announcer sets
+        // the stage first: "The duel begins" → beat → "Ready for showdown" →
+        // ready up. The countdown can't start until both devices finish this.
+        playVoiceLine("TheDuelBeginsSFX") { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self?.startRoundWithShowdownCall()
+            }
+        }
     }
     
     // MARK: - Touch Handling
@@ -391,6 +411,7 @@ class GameScene: SKScene {
         }
         if matchController.matchPhase == .awaitingContinue {
             matchController.continueToNextRound()
+            startRoundWithShowdownCall()
             return
         }
         // Intentionally no fire-handling here.
@@ -701,6 +722,50 @@ class GameScene: SKScene {
         }
     }
     
+    // MARK: - Announcer voice lines
+
+    /// Play one announcer line (BullseyeSFX, ReadyForShowdownSFX, …) on the
+    /// single voice channel, replacing whatever line was still playing.
+    /// `completion` fires when the line ends — and also when the file is
+    /// missing or fails, so the duel flow can never stall on audio.
+    private func playVoiceLine(_ resource: String, then completion: (() -> Void)? = nil) {
+        voiceCompletionWorkItem?.cancel()
+        voiceCompletionWorkItem = nil
+        voicePlayer?.stop()
+
+        let url = Bundle.main.url(forResource: resource, withExtension: "mp3")
+            ?? Bundle.main.url(forResource: resource, withExtension: "m4a")
+        guard let url else {
+            print("Missing voice line: \(resource)")
+            completion?()
+            return
+        }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.volume = AppSettings.sfxVolume
+            player.prepareToPlay()
+            player.play()
+            voicePlayer = player
+            if let completion {
+                let item = DispatchWorkItem(block: completion)
+                voiceCompletionWorkItem = item
+                DispatchQueue.main.asyncAfter(deadline: .now() + player.duration, execute: item)
+            }
+        } catch {
+            print("Failed to play voice line \(resource): \(error.localizedDescription)")
+            completion?()
+        }
+    }
+
+    /// "Ready for showdown…" then this device readies up. The countdown still
+    /// starts only when BOTH devices get here (the both-ready gate), which is
+    /// what keeps the shared schedule in sync.
+    private func startRoundWithShowdownCall() {
+        playVoiceLine("ReadyForShowdownSFX") { [weak self] in
+            self?.countdownController.pressReady()
+        }
+    }
+
     // MARK: - Volume helpers
 
     private func playCountdownTickAudio() {
@@ -730,6 +795,23 @@ class GameScene: SKScene {
             jammedPlayer?.play()
         } catch {
             print("Failed to play gun jammed audio: \(error.localizedDescription)")
+        }
+    }
+
+    /// Short "FIRE!" sting the instant the firing window opens. Both devices
+    /// open the window at the same synced instant, so this is heard together.
+    private func playFirePromptAudio() {
+        guard let url = Bundle.main.url(forResource: "FireSFX", withExtension: "m4a") else {
+            print("Could not find FireSFX.m4a")
+            return
+        }
+        do {
+            firePromptPlayer = try AVAudioPlayer(contentsOf: url)
+            firePromptPlayer?.volume = AppSettings.sfxVolume
+            firePromptPlayer?.prepareToPlay()
+            firePromptPlayer?.play()
+        } catch {
+            print("Failed to play fire prompt audio: \(error.localizedDescription)")
         }
     }
 
@@ -795,18 +877,30 @@ class GameScene: SKScene {
         }
     }
 
-    /// Buzz when the firing window opens, so the signal is felt even while the
-    /// phone is holstered at the hip rather than being watched.
+    /// "DRAW!" — the firing window just opened. A hard double-kick with a
+    /// rumble tail, unmistakable from the single countdown ticks even with the
+    /// phone holstered at the hip rather than being watched.
     private func playDrawSignalHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
 
-        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
-        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.4)
-
-        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+        let events = [
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)],
+                          relativeTime: 0),
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)],
+                          relativeTime: 0.09),
+            CHHapticEvent(eventType: .hapticContinuous,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)],
+                          relativeTime: 0.18,
+                          duration: 0.3)
+        ]
 
         do {
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let pattern = try CHHapticPattern(events: events, parameters: [])
             let player = try hapticEngine?.makePlayer(with: pattern)
             try player?.start(atTime: 0)
         } catch {
@@ -832,20 +926,60 @@ class GameScene: SKScene {
         }
     }
 
+    /// Got shot: one hard impact, then a heavy rumble that drains away — the
+    /// losing side of the round, felt as clearly as it's seen.
     private func playGetHitHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-        
-        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
-        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1)
-        
-        let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [intensity, sharpness], relativeTime: 0, duration: 0.4)
-        
+
+        let events = [
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)],
+                          relativeTime: 0),
+            CHHapticEvent(eventType: .hapticContinuous,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.05)],
+                          relativeTime: 0.05,
+                          duration: 0.6)
+        ]
+        // Fade the rumble out over its duration so it feels like collapsing,
+        // not a flat buzz.
+        let decay = CHHapticParameterCurve(
+            parameterID: .hapticIntensityControl,
+            controlPoints: [
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0.05, value: 1.0),
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0.65, value: 0.0)
+            ],
+            relativeTime: 0
+        )
+
         do {
-            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let pattern = try CHHapticPattern(events: events, parameterCurves: [decay])
             let player = try hapticEngine?.makePlayer(with: pattern)
             try player?.start(atTime: 0)
         } catch {
             print("Failed to play get hit haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Won the round: three quick, crisp taps rising in strength — light and
+    /// celebratory, the opposite feel of the loser's heavy hit.
+    private func playRoundWonHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let events = [0.0, 0.12, 0.24].enumerated().map { index, time in
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5 + 0.25 * Float(index)),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8 + 0.1 * Float(index))],
+                          relativeTime: time)
+        }
+
+        do {
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play round won haptic: \(error.localizedDescription)")
         }
     }
 }
