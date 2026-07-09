@@ -9,6 +9,9 @@ import SwiftUI
 
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
+    // The app overrides the language via `.environment(\.locale, …)`. `String(localized:)`
+    // ignores that, so we read it here and resolve each step against it explicitly.
+    @Environment(\.locale) private var locale
     private let steps: [LocalizedStringResource] = [
         "Press **“Create game”** to host a new game, or you can join a host's game with **“Join game”** and find any game you wish to join.",
         "Before pressing **“Ready,”** take a distance between you and the other player. While this is not required for gameplay, it is advised to **avoid physical** contact with the other player.",
@@ -18,10 +21,16 @@ struct HelpView: View {
     ]
 
     private func highlighted(_ resource: LocalizedStringResource) -> AttributedString {
+        // Resolve against the in-app locale, not the process default, so the tutorial
+        // follows the language chosen in Settings like the rest of the UI.
+        var resource = resource
+        resource.locale = locale
+        let raw = String(localized: resource)
+
         var attributed = (try? AttributedString(
-            markdown: String(localized: resource),
+            markdown: raw,
             options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
-        )) ?? AttributedString(String(localized: resource))
+        )) ?? AttributedString(raw)
         attributed.font = Font.bodyCSG
         attributed.foregroundColor = Color.ternaryCSG.opacity(0.7)
 
