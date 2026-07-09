@@ -82,6 +82,13 @@ struct MainMenuView: View {
                             if gameCenterManager.isAuthenticated {
                                 Button {
                                     showLeaderboard = true
+                                    GKAccessPoint.shared.trigger(
+                                        leaderboardID: GameCenterManager.leaderboardID,
+                                        playerScope: .global,
+                                        timeScope: .allTime
+                                    ) {
+                                        showLeaderboard = false
+                                    }
                                 } label: {
                                     Image(systemName: "trophy.fill")
                                 }
@@ -123,10 +130,6 @@ struct MainMenuView: View {
             .toolbar(.hidden, for: .navigationBar)
             .fullScreenCover(isPresented: $showDrawPoseTest) {
                 DrawPoseTestView()
-            }
-            .sheet(isPresented: $showLeaderboard) {
-                GameCenterDashboardView(onFinish: { showLeaderboard = false })
-                    .ignoresSafeArea()
             }
         }
         .overlay {

@@ -115,32 +115,3 @@ struct GameCenterAuthView: UIViewControllerRepresentable {
     func updateUIViewController(_ uiViewController: UIViewController, context: Context){}
 }
 
-/// Presents the native Game Center dashboard opened straight to our leaderboard.
-/// The Done button is wired through the delegate to `onFinish` so SwiftUI can dismiss.
-struct GameCenterDashboardView: UIViewControllerRepresentable {
-    var leaderboardID: String = GameCenterManager.leaderboardID
-    let onFinish: () -> Void
-
-    func makeUIViewController(context: Context) -> GKGameCenterViewController {
-        let viewController = GKGameCenterViewController(
-            leaderboardID: leaderboardID,
-            playerScope: .global,
-            timeScope: .allTime
-        )
-        viewController.gameCenterDelegate = context.coordinator
-        return viewController
-    }
-
-    func updateUIViewController(_ uiViewController: GKGameCenterViewController, context: Context) {}
-
-    func makeCoordinator() -> Coordinator { Coordinator(onFinish: onFinish) }
-
-    final class Coordinator: NSObject, GKGameCenterControllerDelegate {
-        let onFinish: () -> Void
-        init(onFinish: @escaping () -> Void) { self.onFinish = onFinish }
-
-        func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
-            onFinish()
-        }
-    }
-}

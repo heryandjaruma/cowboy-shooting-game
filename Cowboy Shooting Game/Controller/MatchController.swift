@@ -132,7 +132,10 @@ final class MatchController: ObservableObject {
     }
     
     private func scheduleFinish(_ apply: @escaping () -> Void) {
-        DispatchQueue.main.asyncAfter(deadline: .now() + 2.0, execute: apply)
+        Task {
+            try? await Task.sleep(for: .seconds(2))
+            apply()
+        }
     }
 
     /// Pass wins here
