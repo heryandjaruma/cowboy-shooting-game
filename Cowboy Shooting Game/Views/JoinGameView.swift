@@ -152,7 +152,11 @@ struct JoinGameView: View {
             }
         }
                 .toolbar(.hidden, for: .navigationBar)
-        .onAppear { controller.start() }
+        .onAppear {
+            controller.start()
+            // Continues if already playing; restores lobby music after a match.
+            MusicManager.shared.play(.lobby)
+        }
         .onChange(of: connection.state) { _, newState in
             // Joined a room — both players meet on the confirmation screen.
             if case .connected = newState {

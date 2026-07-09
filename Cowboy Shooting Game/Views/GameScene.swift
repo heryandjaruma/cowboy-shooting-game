@@ -202,18 +202,8 @@ class GameScene: SKScene {
             let numTex = SKTexture(imageNamed: "num\(n)")
             numTex.filteringMode = .nearest
             countdownNode.texture = numTex
-            
-            let targetHeight: CGFloat = 220
-            let aspect = numTex.size().width / numTex.size().height
-            countdownNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-            
-            countdownNode.removeAllActions()
-            countdownNode.setScale(0.2)
-            countdownNode.alpha = 1.0
-            countdownNode.run(SKAction.sequence([
-                SKAction.scale(to: 0.69, duration: 0.12),
-                SKAction.scale(to: 0.42, duration: 0.08)
-            ]))
+            countdownNode.size = overlaySize(for: numTex, height: 92)
+            popIn(countdownNode)
             playCountdownTickAudio()
             playCountdownTickHaptic()
 
@@ -224,13 +214,16 @@ class GameScene: SKScene {
             resultNode.removeAllActions();     resultNode.alpha = 0.0
             dimmingNode.run(SKAction.fadeOut(withDuration: 0.25))
             // Show fire image with a looping pulse
+            if let fireTex = fireNode.texture {
+                fireNode.size = overlaySize(for: fireTex, height: 100)
+            }
             fireNode.removeAllActions()
-            fireNode.setScale(0.2)
+            fireNode.setScale(0.6)
             fireNode.alpha = 1.0
-            let grow = SKAction.scale(to: 1.05, duration: 0.18)
+            let grow = SKAction.scale(to: 1.0, duration: 0.18)
             let pulse = SKAction.sequence([
-                SKAction.scale(to: 0.42, duration: 0.35),
-                SKAction.scale(to: 0.69, duration: 0.35)
+                SKAction.scale(to: 0.8, duration: 0.35),
+                SKAction.scale(to: 1.0, duration: 0.35)
             ])
             fireNode.run(SKAction.sequence([grow, SKAction.repeatForever(pulse)]))
         }
@@ -247,19 +240,10 @@ class GameScene: SKScene {
         
         let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose")
         resultTex.filteringMode = .nearest
-        
-        let targetHeight: CGFloat = 260
-        let aspect = resultTex.size().width / resultTex.size().height
         resultNode.texture = resultTex
-        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-        
-        resultNode.setScale(0.2)
-        resultNode.alpha = 1.0
-        resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 0.69, duration: 0.15),
-            SKAction.scale(to: 0.42, duration: 0.10)
-        ]))
-        
+        resultNode.size = overlaySize(for: resultTex, height: 110)
+        popIn(resultNode)
+
         if outcome == .loser {
             playGetHitHaptic()
         }
@@ -272,24 +256,14 @@ class GameScene: SKScene {
     }
     
     private func showMatchOver(won: Bool) {
-        resultNode.removeAllActions()
         let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
         tex.filteringMode = .nearest
-        
-        let targetHeight: CGFloat = 400
-        let aspect = tex.size().width / tex.size().height
         resultNode.texture = tex
-        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-        
-        resultNode.setScale(0.2)
-        resultNode.alpha = 1.0
-        resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 0.69, duration: 0.15),
-            SKAction.scale(to: 0.42, duration: 0.10)
-        ]))
+        resultNode.size = overlaySize(for: tex, height: 170)
+        popIn(resultNode)
 
-        matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
-        matchSummaryLabel.alpha = 1.0
+        // matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
+        // matchSummaryLabel.alpha = 1.0
 
         showReturnToMenuPrompt()
     }
@@ -320,6 +294,38 @@ class GameScene: SKScene {
             .fadeAlpha(to: 0.3, duration: 0.6),
             .fadeAlpha(to: 1.0, duration: 0.6)
         ])))
+    }
+
+    // MARK: - Overlay sizing
+
+    /// Aspect-fit `texture` into a box `height` points tall, capped at 85% of
+    /// the scene width. An overlay's on-screen size must always come from here —
+    /// never from the texture's native size, which is just the PNG's pixel count
+    /// and silently changes layout whenever an asset is re-exported (victory.png
+    /// is 500×157: height-only sizing rendered it 535pt wide, off both screen edges).
+    private func overlaySize(for texture: SKTexture, height: CGFloat) -> CGSize {
+        let tex = texture.size()
+        var h = height
+        var w = h * (tex.width / tex.height)
+        let maxWidth = size.width * 0.85
+        if w > maxWidth {
+            h *= maxWidth / w
+            w = maxWidth
+        }
+        return CGSize(width: w, height: h)
+    }
+
+    /// Shared pop-in for overlay sprites. Scale settles at exactly 1.0, so a
+    /// node's `size` IS what appears on screen (previously everything settled
+    /// at 0.42×, so no sizing constant in this file matched the rendered result).
+    private func popIn(_ node: SKSpriteNode) {
+        node.removeAllActions()
+        node.setScale(0.6)
+        node.alpha = 1.0
+        node.run(SKAction.sequence([
+            SKAction.scale(to: 1.15, duration: 0.12),
+            SKAction.scale(to: 1.0, duration: 0.08)
+        ]))
     }
     
     
@@ -697,16 +703,6 @@ class GameScene: SKScene {
     
     // MARK: - Volume helpers
 
-    private var masterVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
-    }
-    private var sfxVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.sfxVolumeKey) as? Double ?? 1.0)
-    }
-    private var gunshotVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.gunshotVolumeKey) as? Double ?? 1.0)
-    }
-
     private func playCountdownTickAudio() {
         guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else {
             print("Could not find CountdownTick.m4a")
@@ -714,7 +710,7 @@ class GameScene: SKScene {
         }
         do {
             tickPlayer = try AVAudioPlayer(contentsOf: url)
-            tickPlayer?.volume = masterVolume * sfxVolume
+            tickPlayer?.volume = AppSettings.sfxVolume
             tickPlayer?.prepareToPlay()
             tickPlayer?.play()
         } catch {
@@ -729,7 +725,7 @@ class GameScene: SKScene {
         }
         do {
             jammedPlayer = try AVAudioPlayer(contentsOf: url)
-            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.volume = AppSettings.sfxVolume
             jammedPlayer?.prepareToPlay()
             jammedPlayer?.play()
         } catch {
@@ -745,7 +741,7 @@ class GameScene: SKScene {
 
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
-            audioPlayer?.volume = masterVolume * gunshotVolume
+            audioPlayer?.volume = AppSettings.gunshotVolume
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {

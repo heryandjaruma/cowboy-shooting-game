@@ -83,6 +83,8 @@ final class MusicManager: ObservableObject {
         }
     }
 
+    /// Declare what should be playing on the current screen: starts `track`,
+    /// or simply continues if it's already the current track.
     func play(_ track: MusicTrack, loop: Bool = true, crossfade: Bool = true) {
         guard currentTrack != track else { return }
 
@@ -91,14 +93,18 @@ final class MusicManager: ObservableObject {
             return
         }
 
+        // Claim the track immediately, so a play() landing during a fading
+        // stop()/crossfade isn't swallowed by the stale currentTrack.
+        currentTrack = track
         if crossfade, let oldPlayer = player {
+            player = nil
             fadeOut(oldPlayer) { [weak self] in
-                self?.startNewPlayer(url: url, track: track, loop: loop)
+                guard let self, self.currentTrack == track else { return }
+                self.startNewPlayer(url: url, track: track, loop: loop)
             }
         } else {
             player?.stop()
-            self.player = nil
-            self.currentTrack = nil
+            player = nil
             startNewPlayer(url: url, track: track, loop: loop)
         }
     }
@@ -106,16 +112,14 @@ final class MusicManager: ObservableObject {
     func stop(fade: Bool = true) {
         stopHeartbeat()
         guard let player else { return }
+        // Clear immediately so a play() during the fade isn't ignored.
+        self.player = nil
+        currentTrack = nil
 
         if fade {
-            fadeOut(player) { [weak self] in
-                self?.player = nil
-                self?.currentTrack = nil
-            }
+            fadeOut(player) {}
         } else {
             player.stop()
-            self.player = nil
-            self.currentTrack = nil
         }
     }
 
@@ -224,18 +228,14 @@ final class MusicManager: ObservableObject {
 
     // MARK: - Fade helpers
 
-    /// Update the currently-playing track's volume to the stored master volume.
+    /// Update the currently-playing track's volume to the stored music volume.
     /// Call from SettingsView.onChange so changes take effect immediately.
-    func applyMasterVolume() {
-        player?.volume = masterVolume
-    }
-
-    private var masterVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
+    func applyMusicVolume() {
+        player?.volume = AppSettings.musicVolume
     }
 
     private func fadeIn(_ player: AVAudioPlayer, duration: TimeInterval = 0.8) {
-        let target = masterVolume
+        let target = AppSettings.musicVolume
         let steps = 20
         let stepDuration = duration / Double(steps)
         var currentStep = 0
