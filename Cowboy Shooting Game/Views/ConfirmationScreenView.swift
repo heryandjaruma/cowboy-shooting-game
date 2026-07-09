@@ -162,6 +162,9 @@ struct ConfirmationScreenView: View {
         scene.connection = connection
         scene.onRequestReturnToMenu = { [weak connection] in
             connection?.stopAll()
+            // Drop the game cover before dismissing the confirmation screen —
+            // dismissing a presenter under a live nested cover can get stuck.
+            navigateToGame = false
             dismiss()
         }
         sceneHolder.scene = scene

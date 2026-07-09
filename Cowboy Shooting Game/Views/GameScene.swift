@@ -299,7 +299,7 @@ class GameScene: SKScene {
     private func showReturnToMenuPrompt() {
         countdownLabel.removeAllActions()
         countdownLabel.position = CGPoint(x: 0, y: -280)   // below the result image
-        countdownLabel.text = "Tap to return to menu"
+        countdownLabel.text = "Tap to return to lobby"
         countdownLabel.fontSize = 36
         countdownLabel.fontColor = .white
         countdownLabel.setScale(1.0)
