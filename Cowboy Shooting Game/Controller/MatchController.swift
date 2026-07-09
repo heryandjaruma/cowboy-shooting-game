@@ -18,7 +18,7 @@ final class MatchController: ObservableObject {
         case matchOver(won: Bool)
     }
     
-    private let resultLingerSeconds: Double = 1.0   // let win/lose land before the prompt
+    private let resultLingerSeconds: Double = 1.6   // let win/lose land and the ~1.5s Bullseye/Outdrawn call finish before the prompt
     
     @Published private(set) var myLives = 3
     @Published private(set) var opponentLives = 3
@@ -111,7 +111,8 @@ final class MatchController: ObservableObject {
         guard matchPhase == .awaitingContinue else { return }
         matchPhase = .playing
         countdown?.resetForNextRound()   // clears outcome, re-arms shooter, phase → .notReady
-        countdown?.pressReady()          // this device readies; countdown starts once BOTH tap
+        // GameScene presses ready once its "Ready for showdown" call finishes,
+        // so the announcer always precedes the countdown; it starts once BOTH tap.
     }
     
     // schedule a tap to continue

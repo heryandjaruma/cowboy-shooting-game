@@ -152,11 +152,7 @@ struct JoinGameView: View {
             }
         }
                 .toolbar(.hidden, for: .navigationBar)
-        .onAppear {
-            controller.start()
-            // Continues if already playing; restores lobby music after a match.
-            MusicManager.shared.play(.lobby)
-        }
+        .onAppear { controller.start() }
         .onChange(of: connection.state) { _, newState in
             // Joined a room — both players meet on the confirmation screen.
             if case .connected = newState {
@@ -171,6 +167,9 @@ struct JoinGameView: View {
                 // Back from the pre-duel screen without a match — browse again.
                 controller.start()
             }
+            // onAppear does NOT re-fire when a fullScreenCover dismisses, so the
+            // music hand-back (game-over/gameplay → lobby) must happen here.
+            MusicManager.shared.play(.lobby)
         }) {
             ConfirmationScreenView(connection: connection, onReturnToMenu: {
                 returnToMenuOnDismiss = true
