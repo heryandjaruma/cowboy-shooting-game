@@ -1,0 +1,35 @@
+{
+  "meta" : {
+    "version" : "2024-11-15"
+  },
+  "resources" : {
+    "leaderboardLocalizations" : {
+      "LocalWinCounts" : [
+        {
+          "formatterOverride" : "INTEGER",
+          "formatterSuffix" : "Menang",
+          "formatterSuffixSingular" : "",
+          "locale" : "id",
+          "localID" : "LocalWinCounts-id",
+          "name" : "Kemenangan"
+        }
+      ]
+    },
+    "leaderboards" : [
+      {
+        "activityProperties" : {
+          "win" : "0"
+        },
+        "archived" : false,
+        "defaultFormatter" : "INTEGER",
+        "referenceName" : "Local Win Counts",
+        "scoreRangeEnd" : null,
+        "scoreRangeStart" : null,
+        "scoreSortType" : "DESC",
+        "submissionType" : "BEST_SCORE",
+        "vendorIdentifier" : "LocalWinCounts",
+        "visibility" : "SHOW_FOR_ALL"
+      }
+    ]
+  }
+}

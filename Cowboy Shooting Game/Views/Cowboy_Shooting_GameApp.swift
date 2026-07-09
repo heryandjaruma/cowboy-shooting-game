@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import GameKit
 
 @main
 struct Cowboy_Shooting_GameApp: App {
@@ -13,7 +14,7 @@ struct Cowboy_Shooting_GameApp: App {
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = false
     @AppStorage(AppSettings.onboardingCompleteKey) private var onboardingComplete = false
-
+    
     var body: some Scene {
         WindowGroup {
             Group {
