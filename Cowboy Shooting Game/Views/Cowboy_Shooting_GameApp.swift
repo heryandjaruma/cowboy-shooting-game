@@ -53,6 +53,12 @@ final class GameCenterManager: ObservableObject {
     @Published var showAuthViewController = false
     var authViewController: UIViewController?
 
+    /// Matches `vendorIdentifier` in GameCenterResources.gamekit — the leaderboard's ID.
+    private static let leaderboardID = "LocalWinCounts"
+    /// Persistent cumulative win tally, so wins survive relaunches and are never lost
+    /// while the player is signed out (they get backfilled on the next submit).
+    private static let winCountKey = "gameCenterWinCount"
+
     private init() {}
 
     func authenticatePlayer() {
@@ -64,6 +70,8 @@ final class GameCenterManager: ObservableObject {
                 } else if GKLocalPlayer.local.isAuthenticated {
                     self?.isAuthenticated = true
                     self?.showAuthViewController = false
+                    // Push any wins earned while signed out up to the leaderboard.
+                    self?.submitWinCount()
                 } else {
                     self?.isAuthenticated = false
                     self?.showAuthViewController = false
@@ -71,6 +79,27 @@ final class GameCenterManager: ObservableObject {
                         print("Game Center Auth Error: \(error.localizedDescription)")
                     }
                 }
+            }
+        }
+    }
+
+    /// Records a duel win: bumps the persistent local tally, then submits the new
+    /// total. The leaderboard is best-score, so the cumulative count is the score.
+    func reportWin() {
+        let newTotal = UserDefaults.standard.integer(forKey: Self.winCountKey) + 1
+        UserDefaults.standard.set(newTotal, forKey: Self.winCountKey)
+        submitWinCount()
+    }
+
+    /// Submits the current local win total to Game Center. Safe to call anytime —
+    /// no-ops until the player is authenticated.
+    func submitWinCount() {
+        guard GKLocalPlayer.local.isAuthenticated else { return }
+        let total = UserDefaults.standard.integer(forKey: Self.winCountKey)
+        GKLeaderboard.submitScore(total, context: 0, player: GKLocalPlayer.local,
+                                  leaderboardIDs: [Self.leaderboardID]) { error in
+            if let error {
+                print("Game Center leaderboard submit error: \(error.localizedDescription)")
             }
         }
     }
