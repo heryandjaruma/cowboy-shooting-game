@@ -12,12 +12,19 @@ struct Cowboy_Shooting_GameApp: App {
     // Stuff from settings go here. Defaults is the hardcoded value
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = false
+    @AppStorage(AppSettings.onboardingCompleteKey) private var onboardingComplete = false
 
     var body: some Scene {
         WindowGroup {
-            MainMenuView()
-                .environment(\.locale, Locale(identifier: languageCode))
-                .grayscale(grayscaleEnabled ? 1.0 : 0.0)
+            Group {
+                if onboardingComplete {
+                    MainMenuView()
+                } else {
+                    OnboardingView(onFinished: { onboardingComplete = true })
+                }
+            }
+            .environment(\.locale, Locale(identifier: languageCode))
+            .grayscale(grayscaleEnabled ? 1.0 : 0.0)
         }
     }
 }

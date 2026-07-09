@@ -11,6 +11,8 @@ import Foundation
 enum AppSettings {
     static let languageKey = "appLanguage"
     static let grayscaleKey = "grayscaleEnabled"
+    /// Flag for onboarding
+    static let onboardingCompleteKey = "onboardingComplete"
     static let languages: [(name: String, code: String)] = [
         ("English", "en"),
         ("Indonesia", "id")

@@ -11,9 +11,7 @@ struct MainMenuView: View {
     @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
-    @AppStorage(GameConnectionManager.playerNameDefaultsKey) private var playerName = ""
     @State private var showNamePrompt = false
-    @State private var nameDraft = ""
     @State private var showDrawPoseTest = false
 
     private let menuOptions: [MenuOption] = [
@@ -51,14 +49,6 @@ struct MainMenuView: View {
                             }
                             .buttonStyle(.cowboyCompact)
                         }
-
-                        Button {
-                            nameDraft = playerName
-                            showNamePrompt = true
-                        } label: {
-                            Text("Got a name?")
-                        }
-                        .buttonStyle(.cowboyCompact)
                     }
                     .padding(.top, 20)
                 }
@@ -76,6 +66,13 @@ struct MainMenuView: View {
                             }
                             .buttonStyle(.cowboyIcon)
                             #endif
+
+                            Button {
+                                showNamePrompt = true
+                            } label: {
+                                Image(systemName: "person.fill")
+                            }
+                            .buttonStyle(.cowboyIcon)
 
                             Button {
                                 path.append(MenuDestination.helpGame)
@@ -110,19 +107,107 @@ struct MainMenuView: View {
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
-            .alert("Got a name?", isPresented: $showNamePrompt) {
-                TextField("Enter your name", text: $nameDraft)
-                Button("Save") {
-                    playerName = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
-                }
-                Button("Cancel", role: .cancel) {}
-            } message: {
-                Text("What does the town call you, Slinger?")
-            }
             .fullScreenCover(isPresented: $showDrawPoseTest) {
                 DrawPoseTestView()
             }
         }
+        .overlay {
+            if showNamePrompt {
+                NamePromptView(
+                    onConfirm: { showNamePrompt = false },
+                    onCancel: { showNamePrompt = false }
+                )
+            }
+        }
+    }
+}
+
+struct NamePromptView: View {
+    @AppStorage(GameConnectionManager.playerNameDefaultsKey) private var playerName = ""
+    @State private var nameDraft = ""
+    @State private var randomIndex = 0
+
+    let onConfirm: () -> Void
+    var onCancel: (() -> Void)? = nil
+
+    var body: some View {
+        ZStack {
+            // Dimmed backdrop; tapping outside the card cancels when allowed.
+            Color.black.opacity(0.5)
+                .ignoresSafeArea()
+                .contentShape(Rectangle())
+                .onTapGesture { onCancel?() }
+
+            VStack(spacing: 20) {
+                Text("What's your name, Slinger?")
+                    .font(.headingCSG)
+                    .foregroundColor(Color.ternaryCSG)
+                    .multilineTextAlignment(.center)
+
+                TextField(text: $nameDraft){
+                    Text("You can change it again later")
+                        .foregroundStyle(Color.ternaryCSG.opacity(0.5))
+                }
+                    .font(.bodyCSG)
+                    .foregroundColor(Color.ternaryCSG)
+                    .autocorrectionDisabled()
+                    .textInputAutocapitalization(.words)
+                    .submitLabel(.done)
+                    .onSubmit(confirmName)
+                    .padding(.vertical, 14)
+                    .padding(.horizontal, 16)
+                    .frame(maxWidth: 540)
+                    .background(
+                        RoundedRectangle(cornerRadius: 14)
+                            .fill(Color.secondaryCSG)
+                            .stroke(Color.ternaryCSG, lineWidth: 3)
+                    )
+
+                HStack (spacing: 20) {
+                    Button(action: cycleRandomName) {
+                        Text("Random")
+                    }
+                    .buttonStyle(.cowboyCompact)
+                    Spacer()
+                    Button(action: confirmName) {
+                        Text("OK")
+                        .frame(minWidth: 44)
+                    }
+                    .buttonStyle(.cowboyCompact)
+                }
+                .frame(maxWidth: 450)
+            }
+            .padding(24)
+            .background(
+                RoundedRectangle(cornerRadius: 20)
+                    .fill(Color.primaryCSG)
+                    .stroke(Color.ternaryCSG, lineWidth: 4)
+            )
+            .padding(.horizontal, 32)
+        }
+        .onAppear {
+            // Seed the field with the current name so an existing name shows for editing.
+            nameDraft = playerName
+            randomIndex = Int.random(in: 0..<max(GameConnectionManager.suggestedNames.count, 1))
+        }
+    }
+
+    /// Shows the next suggested alias in the field without committing it — the name
+    /// is only assigned when the player taps OK.
+    private func cycleRandomName() {
+        let names = GameConnectionManager.suggestedNames
+        guard !names.isEmpty else { return }
+        nameDraft = names[randomIndex % names.count]
+        randomIndex += 1
+    }
+
+    /// Commits the typed name, or falls back to a random alias when left blank.
+    private func confirmName() {
+        let trimmed = nameDraft.trimmingCharacters(in: .whitespacesAndNewlines)
+        playerName = trimmed.isEmpty
+            ? (GameConnectionManager.suggestedNames.randomElement() ?? "Stranger")
+            : trimmed
+        onConfirm()
     }
 }
 
