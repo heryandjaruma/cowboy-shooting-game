@@ -7,12 +7,14 @@
 
 
 import SwiftUI
+import Lottie
 
 struct CreateGameView: View {
     @ObservedObject var connection: GameConnectionManager
     @Environment(\.dismiss) private var dismiss
     @State private var isPulsing = false
     @State private var navigateToConfirmation = false
+    @State private var playbackMode : LottiePlaybackMode = .paused
 
     var body: some View {
         ZStack {
@@ -31,12 +33,14 @@ struct CreateGameView: View {
                 }
 
                 Spacer()
-
-                Image(.wifi)
+                
+                LottieView(animation: .named("connectionWifi"))
+                    .playing()
+                    .looping()
+                    .animationSpeed(0.20)
                     .resizable()
-                    .scaledToFit()
-                    .frame(height: 180)
-
+                    .frame(width: 200, height: 200)
+                
                 Spacer()
 
                 Text("Game created, waiting for a player.")
