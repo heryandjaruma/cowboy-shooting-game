@@ -105,6 +105,7 @@ final class ShotController: ObservableObject {
         switch opcode {
         case Opcode.draw where connection.isHost:
             remoteReaction = BinaryCoding.decode(Data(body.dropFirst()))
+            armDrawTimeout() // the joiner drew first — the host now gets drawGrace to answer
             resolveIfPossible()
         case Opcode.resultWin where !connection.isHost:
             settle(.winner)
