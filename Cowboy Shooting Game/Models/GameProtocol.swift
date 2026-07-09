@@ -132,6 +132,7 @@ nonisolated enum GameChannel: UInt8 {
     case clock = 3   // clock-offset estimation (GameConnectionManager)
     case scene = 4   // "both players reached the GameScene" handshake (GameScene)
     case life = 5   // lives / match-over coordination (MatchController)
+    case audio = 6  // music sync — host broadcasts track start timestamp (MusicManager)
 }
 
 /// Little-endian encoding for the scalar values we ship inside game events.

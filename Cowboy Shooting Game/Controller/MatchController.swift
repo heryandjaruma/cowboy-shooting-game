@@ -18,7 +18,7 @@ final class MatchController: ObservableObject {
         case matchOver(won: Bool)
     }
     
-    private let resultLingerSeconds: Double = 1.0   // let win/lose land before the prompt
+    private let resultLingerSeconds: Double = 1.6   // let win/lose land and the ~1.5s Bullseye/Outdrawn call finish before the prompt
     
     @Published private(set) var myLives = 3
     @Published private(set) var opponentLives = 3
@@ -33,7 +33,7 @@ final class MatchController: ObservableObject {
     private var joinerLives = 3
     
     private enum Opcode {
-        static let matchOver: UInt8 = 0         // host send to joiner: 1 byte joinerWon (0/1)
+        static let matchOver: UInt8 = 0         // host send to joiner: 1 byte joinerWon (0/1), 1 byte hostLives, 1 byte joinerLives
         static let continueRound: UInt8 = 1     // host send to joiner: 1 byte hostLives, 1 byte joinerLives
     }
     
@@ -69,7 +69,8 @@ final class MatchController: ObservableObject {
         if hostLives == 0 || joinerLives == 0 {
             let joinerWon = hostLives == 0
             connection.sendEvent(channel: GameChannel.life.rawValue,
-                                 body: Data([Opcode.matchOver, joinerWon ? 1 : 0]))
+                                 body: Data([Opcode.matchOver, joinerWon ? 1 : 0,
+                                             UInt8(hostLives), UInt8(joinerLives)]))
             scheduleFinish { self.matchPhase = .matchOver(won: !joinerWon) }
         } else {
             connection.sendEvent(channel: GameChannel.life.rawValue,
@@ -84,8 +85,12 @@ final class MatchController: ObservableObject {
         guard let opcode = body.first else { return }
         switch opcode {
         case Opcode.matchOver:
-            guard body.count > 1 else { return }
+            guard body.count > 3 else { return }
             let joinerWon = body[1] == 1
+            // Final lives ride along so the joiner's hearts and end-of-match
+            // summary reflect the fatal round, not the previous one.
+            opponentLives = Int(body[2])    // host's lives
+            myLives = Int(body[3])          // joiner's own lives
             scheduleFinish {
                 self.matchPhase = .matchOver(won: joinerWon)
             }
@@ -106,7 +111,8 @@ final class MatchController: ObservableObject {
         guard matchPhase == .awaitingContinue else { return }
         matchPhase = .playing
         countdown?.resetForNextRound()   // clears outcome, re-arms shooter, phase → .notReady
-        countdown?.pressReady()          // this device readies; countdown starts once BOTH tap
+        // GameScene presses ready once its "Ready for showdown" call finishes,
+        // so the announcer always precedes the countdown; it starts once BOTH tap.
     }
     
     // schedule a tap to continue

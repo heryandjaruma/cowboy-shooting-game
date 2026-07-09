@@ -30,6 +30,7 @@ final class TriggerController: ObservableObject {
     }
  
     private var observation: NSKeyValueObservation?
+    private var foregroundObserver: NSObjectProtocol?
     private let audioSession = AVAudioSession.sharedInstance()
  
     private var hiddenTriggerView: MPVolumeView?
@@ -40,36 +41,67 @@ final class TriggerController: ObservableObject {
  
     private var lastSliderUpdateTime: Date = .distantPast
     private let throttleInterval: TimeInterval = 0.05
+
+    // When false the volume button behaves normally (lobby, menus).
+    // When true (gameplay) the button is intercepted as a game trigger.
+    private var isEnabled = false
  
     private init() {
         try? audioSession.setCategory(.playback, options: [.duckOthers])
         try? audioSession.setActive(true)
- 
+
         startSilentPlayback()
-        
-        DispatchQueue.main.async {
-            self.setupHiddenTriggerView()
-        }
- 
+
+        // Master mirrors the device volume: seed it at startup, then keep it in
+        // sync (KVO below + foreground refresh) whenever we're NOT intercepting.
+        state.baselineTrigger = Self.clampBaseline(audioSession.outputVolume)
+
         observation = audioSession.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
             guard let self = self else { return }
             guard let oldVal = change.oldValue, let newVal = change.newValue, oldVal != newVal else { return }
- 
+
             DispatchQueue.main.async {
+                // Outside gameplay the button is a normal volume control —
+                // track it so Master always shows the device volume.
+                guard self.isEnabled else {
+                    self.state.baselineTrigger = Self.clampBaseline(newVal)
+                    return
+                }
+
                 if abs(newVal - self.state.baselineTrigger) < 0.001 {
                     return
                 }
- 
+
                 let direction: TriggerDirection = newVal > oldVal ? .up : .down
- 
+
                 self.triggerVisualFeedback(message: direction == .up ? "Trigger UP Hit" : "Trigger DOWN Hit")
                 self.delegate?.triggerController(self, didDetectDirection: direction)
                 self.onTrigger?(direction)
- 
+
                 // Tombol melewati throttle supaya loop hardware langsung ter-reset instan
                 self.pinTrigger(to: self.state.baselineTrigger, forceImmediate: true)
             }
         }
+
+        // KVO can't fire while the app is suspended, so refresh Master when
+        // returning from the background, where the buttons ran free.
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isEnabled else { return }
+                self.state.baselineTrigger = Self.clampBaseline(self.audioSession.outputVolume)
+            }
+        }
+    }
+
+    /// Keep the baseline inside the Settings slider's range: pinned at exactly
+    /// 0 or 1 one of the two button directions would produce no volume change,
+    /// and that trigger direction would go dead in-game.
+    private static func clampBaseline(_ value: Float) -> Float {
+        min(max(value, 0.05), 0.95)
     }
  
     // MARK: - Silent audio session keep-alive
@@ -149,16 +181,42 @@ final class TriggerController: ObservableObject {
         pinTrigger(to: value, forceImmediate: false)
     }
  
+    /// Enable trigger interception — call when entering the game scene.
     func reactivate() {
+        isEnabled = true
         try? audioSession.setActive(true)
         if !silentEngine.isRunning { try? silentEngine.start() }
         if !silentPlayer.isPlaying { silentPlayer.play() }
- 
+
         if hiddenTriggerView?.superview == nil {
             setupHiddenTriggerView()
         } else {
             pinTrigger(to: state.baselineTrigger, forceImmediate: true)
         }
+    }
+
+    /// Disable trigger interception — call when leaving the game scene so the
+    /// volume button restores normal system-volume behaviour in the lobby/menus.
+    func disable() {
+        isEnabled = false
+        hiddenTriggerView?.removeFromSuperview()
+        systemSlider = nil
+    }
+
+    /// Install the hidden system slider so the Settings "Master" slider can set
+    /// the device volume. No interception — that's `reactivate`, gameplay only.
+    func beginSystemVolumeControl() {
+        if hiddenTriggerView?.superview == nil {
+            setupHiddenTriggerView()
+        }
+    }
+
+    /// Remove the hidden slider when Settings closes so the normal system
+    /// volume HUD returns in the menus. No-op mid-game (the trigger needs it).
+    func endSystemVolumeControl() {
+        guard !isEnabled else { return }
+        hiddenTriggerView?.removeFromSuperview()
+        systemSlider = nil
     }
  
     private func triggerVisualFeedback(message: String) {
@@ -172,6 +230,9 @@ final class TriggerController: ObservableObject {
  
     deinit {
         observation?.invalidate()
+        if let foregroundObserver {
+            NotificationCenter.default.removeObserver(foregroundObserver)
+        }
     }
 }
  

@@ -15,6 +15,7 @@ struct CreateGameView: View {
     @State private var isPulsing = false
     @State private var navigateToConfirmation = false
     @State private var playbackMode : LottiePlaybackMode = .paused
+    @State private var returnToMenuOnDismiss = false
 
     var body: some View {
         ZStack {
@@ -58,12 +59,21 @@ struct CreateGameView: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToConfirmation, onDismiss: {
-            // Back from the pre-duel screen without a match — host again.
-            if case .connected = connection.state {} else {
+            if returnToMenuOnDismiss {
+                // Connection was lost mid-duel — unwind to the main menu.
+                dismiss()
+            } else if case .connected = connection.state {} else {
+                // Back from the pre-duel screen without a match — host again.
                 connection.startHosting()
             }
+            // onAppear does NOT re-fire when a fullScreenCover dismisses, so the
+            // music hand-back (game-over/gameplay → lobby) must happen here.
+            MusicManager.shared.play(.lobby)
         }) {
-            ConfirmationScreenView(connection: connection)
+            ConfirmationScreenView(connection: connection, onReturnToMenu: {
+                returnToMenuOnDismiss = true
+                navigateToConfirmation = false
+            })
         }
     }
 }
