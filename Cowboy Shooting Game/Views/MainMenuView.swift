@@ -6,13 +6,16 @@
 //
 
 import SwiftUI
+import GameKit
 
 struct MainMenuView: View {
+    @EnvironmentObject private var gameCenterManager: GameCenterManager
     @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
     @State private var showNamePrompt = false
     @State private var showDrawPoseTest = false
+    @State private var showLeaderboard = false
 
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
@@ -74,6 +77,17 @@ struct MainMenuView: View {
                             }
                             .buttonStyle(.cowboyIcon)
 
+                            // Only useful once signed in — presenting the dashboard
+                            // while unauthenticated just shows Game Center's sign-in.
+                            if gameCenterManager.isAuthenticated {
+                                Button {
+                                    showLeaderboard = true
+                                } label: {
+                                    Image(systemName: "trophy.fill")
+                                }
+                                .buttonStyle(.cowboyIcon)
+                            }
+
                             Button {
                                 path.append(MenuDestination.helpGame)
                             } label: {
@@ -110,6 +124,10 @@ struct MainMenuView: View {
             .fullScreenCover(isPresented: $showDrawPoseTest) {
                 DrawPoseTestView()
             }
+            .sheet(isPresented: $showLeaderboard) {
+                GameCenterDashboardView(onFinish: { showLeaderboard = false })
+                    .ignoresSafeArea()
+            }
         }
         .overlay {
             if showNamePrompt {
@@ -122,7 +140,29 @@ struct MainMenuView: View {
         .onAppear {
             MusicManager.shared.attach(to: connection)
             MusicManager.shared.play(.lobby)
+            syncAccessPoint()
         }
+        .onDisappear { syncAccessPoint() }
+        // Pushing a child onto the NavigationStack does NOT fire this view's
+        // onDisappear (the stack container stays mounted), so drive the access point
+        // off the actual navigation state instead: visible only at the root.
+        .onChange(of: path) { _, _ in syncAccessPoint() }
+        .onChange(of: showDrawPoseTest) { _, _ in syncAccessPoint() }
+        .onChange(of: showLeaderboard) { _, _ in syncAccessPoint() }
+        // Auth can complete asynchronously after this view has already appeared.
+        .onChange(of: gameCenterManager.isAuthenticated) { _, _ in syncAccessPoint() }
+    }
+
+    /// The Game Center access point (top-leading "rocket" badge) belongs to the menu
+    /// only: shown when authenticated and sitting at the navigation root, hidden the
+    /// moment we push a destination or present the pose-test cover.
+    private var shouldShowAccessPoint: Bool {
+        gameCenterManager.isAuthenticated && path.isEmpty && !showDrawPoseTest && !showLeaderboard
+    }
+
+    private func syncAccessPoint() {
+        GKAccessPoint.shared.location = .topLeading
+        GKAccessPoint.shared.isActive = shouldShowAccessPoint
     }
 }
 
@@ -217,4 +257,5 @@ struct NamePromptView: View {
 
 #Preview {
     MainMenuView()
+        .environmentObject(GameCenterManager.shared)
 }
