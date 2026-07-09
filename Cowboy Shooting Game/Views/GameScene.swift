@@ -703,16 +703,6 @@ class GameScene: SKScene {
     
     // MARK: - Volume helpers
 
-    private var masterVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
-    }
-    private var sfxVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.sfxVolumeKey) as? Double ?? 1.0)
-    }
-    private var gunshotVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.gunshotVolumeKey) as? Double ?? 1.0)
-    }
-
     private func playCountdownTickAudio() {
         guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else {
             print("Could not find CountdownTick.m4a")
@@ -720,7 +710,7 @@ class GameScene: SKScene {
         }
         do {
             tickPlayer = try AVAudioPlayer(contentsOf: url)
-            tickPlayer?.volume = masterVolume * sfxVolume
+            tickPlayer?.volume = AppSettings.sfxVolume
             tickPlayer?.prepareToPlay()
             tickPlayer?.play()
         } catch {
@@ -735,7 +725,7 @@ class GameScene: SKScene {
         }
         do {
             jammedPlayer = try AVAudioPlayer(contentsOf: url)
-            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.volume = AppSettings.sfxVolume
             jammedPlayer?.prepareToPlay()
             jammedPlayer?.play()
         } catch {
@@ -751,7 +741,7 @@ class GameScene: SKScene {
 
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
-            audioPlayer?.volume = masterVolume * gunshotVolume
+            audioPlayer?.volume = AppSettings.gunshotVolume
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {

@@ -536,13 +536,6 @@ class DrawPoseTestScene: SKScene {
         }
     }
 
-    private var masterVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.masterVolumeKey) as? Double ?? 1.0)
-    }
-    private var sfxVolume: Float {
-        Float(UserDefaults.standard.object(forKey: AppSettings.sfxVolumeKey) as? Double ?? 1.0)
-    }
-
     private func playGunshotAudio() {
         guard let soundAsset = NSDataAsset(name: "rayne-mixedgun") else {
             print("Could not find the audio asset in the catalog.")
@@ -550,7 +543,7 @@ class DrawPoseTestScene: SKScene {
         }
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
-            audioPlayer?.volume = masterVolume * Float(UserDefaults.standard.object(forKey: AppSettings.gunshotVolumeKey) as? Double ?? 1.0)
+            audioPlayer?.volume = AppSettings.gunshotVolume
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {
@@ -562,7 +555,7 @@ class DrawPoseTestScene: SKScene {
         guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else { return }
         do {
             tickPlayer = try AVAudioPlayer(contentsOf: url)
-            tickPlayer?.volume = masterVolume * sfxVolume
+            tickPlayer?.volume = AppSettings.sfxVolume
             tickPlayer?.prepareToPlay()
             tickPlayer?.play()
         } catch {
@@ -574,7 +567,7 @@ class DrawPoseTestScene: SKScene {
         guard let url = Bundle.main.url(forResource: "GunJammed", withExtension: "m4a") else { return }
         do {
             jammedPlayer = try AVAudioPlayer(contentsOf: url)
-            jammedPlayer?.volume = masterVolume * sfxVolume
+            jammedPlayer?.volume = AppSettings.sfxVolume
             jammedPlayer?.prepareToPlay()
             jammedPlayer?.play()
         } catch {

@@ -30,6 +30,7 @@ final class TriggerController: ObservableObject {
     }
  
     private var observation: NSKeyValueObservation?
+    private var foregroundObserver: NSObjectProtocol?
     private let audioSession = AVAudioSession.sharedInstance()
  
     private var hiddenTriggerView: MPVolumeView?
@@ -48,20 +49,25 @@ final class TriggerController: ObservableObject {
     private init() {
         try? audioSession.setCategory(.playback, options: [.duckOthers])
         try? audioSession.setActive(true)
- 
+
         startSilentPlayback()
-        
-        DispatchQueue.main.async {
-            self.setupHiddenTriggerView()
-        }
- 
+
+        // Master mirrors the device volume: seed it at startup, then keep it in
+        // sync (KVO below + foreground refresh) whenever we're NOT intercepting.
+        state.baselineTrigger = Self.clampBaseline(audioSession.outputVolume)
+
         observation = audioSession.observe(\.outputVolume, options: [.old, .new]) { [weak self] _, change in
             guard let self = self else { return }
-            // Outside gameplay let the OS handle volume normally.
-            guard self.isEnabled else { return }
             guard let oldVal = change.oldValue, let newVal = change.newValue, oldVal != newVal else { return }
 
             DispatchQueue.main.async {
+                // Outside gameplay the button is a normal volume control —
+                // track it so Master always shows the device volume.
+                guard self.isEnabled else {
+                    self.state.baselineTrigger = Self.clampBaseline(newVal)
+                    return
+                }
+
                 if abs(newVal - self.state.baselineTrigger) < 0.001 {
                     return
                 }
@@ -76,6 +82,26 @@ final class TriggerController: ObservableObject {
                 self.pinTrigger(to: self.state.baselineTrigger, forceImmediate: true)
             }
         }
+
+        // KVO can't fire while the app is suspended, so refresh Master when
+        // returning from the background, where the buttons ran free.
+        foregroundObserver = NotificationCenter.default.addObserver(
+            forName: UIApplication.willEnterForegroundNotification,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor [weak self] in
+                guard let self, !self.isEnabled else { return }
+                self.state.baselineTrigger = Self.clampBaseline(self.audioSession.outputVolume)
+            }
+        }
+    }
+
+    /// Keep the baseline inside the Settings slider's range: pinned at exactly
+    /// 0 or 1 one of the two button directions would produce no volume change,
+    /// and that trigger direction would go dead in-game.
+    private static func clampBaseline(_ value: Float) -> Float {
+        min(max(value, 0.05), 0.95)
     }
  
     // MARK: - Silent audio session keep-alive
@@ -176,6 +202,22 @@ final class TriggerController: ObservableObject {
         hiddenTriggerView?.removeFromSuperview()
         systemSlider = nil
     }
+
+    /// Install the hidden system slider so the Settings "Master" slider can set
+    /// the device volume. No interception — that's `reactivate`, gameplay only.
+    func beginSystemVolumeControl() {
+        if hiddenTriggerView?.superview == nil {
+            setupHiddenTriggerView()
+        }
+    }
+
+    /// Remove the hidden slider when Settings closes so the normal system
+    /// volume HUD returns in the menus. No-op mid-game (the trigger needs it).
+    func endSystemVolumeControl() {
+        guard !isEnabled else { return }
+        hiddenTriggerView?.removeFromSuperview()
+        systemSlider = nil
+    }
  
     private func triggerVisualFeedback(message: String) {
         state.statusMessage = message
@@ -188,6 +230,9 @@ final class TriggerController: ObservableObject {
  
     deinit {
         observation?.invalidate()
+        if let foregroundObserver {
+            NotificationCenter.default.removeObserver(foregroundObserver)
+        }
     }
 }
  

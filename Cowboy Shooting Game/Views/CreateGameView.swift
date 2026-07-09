@@ -47,7 +47,11 @@ struct CreateGameView: View {
             }.padding(.top,20)
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onAppear { connection.startHosting() }
+        .onAppear {
+            connection.startHosting()
+            // Continues if already playing; restores lobby music after a match.
+            MusicManager.shared.play(.lobby)
+        }
         .onChange(of: connection.state) { _, newState in
             // A challenger joined — both players meet on the confirmation screen.
             if case .connected = newState {

@@ -115,7 +115,7 @@ struct SettingsView: View {
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = true
 
-    @AppStorage(AppSettings.masterVolumeKey)  private var masterVolume  = 1.0
+    @AppStorage(AppSettings.musicVolumeKey)   private var musicVolume   = 1.0
     @AppStorage(AppSettings.sfxVolumeKey)     private var sfxVolume     = 1.0
     @AppStorage(AppSettings.gunshotVolumeKey) private var gunshotVolume = 1.0
 
@@ -165,7 +165,7 @@ struct SettingsView: View {
                             range: 0.05...0.95
                         )
 
-                        SettingSliderRow(label: "Music",   value: $masterVolume)
+                        SettingSliderRow(label: "Music",   value: $musicVolume)
                         SettingSliderRow(label: "SFX",     value: $sfxVolume)
                         SettingSliderRow(label: "Gunshot", value: $gunshotVolume)
                     }
@@ -175,9 +175,13 @@ struct SettingsView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: masterVolume) { _, _ in
-            MusicManager.shared.applyMasterVolume()
+        .onChange(of: musicVolume) { _, _ in
+            MusicManager.shared.applyMusicVolume()
         }
+        // The Master slider sets the DEVICE volume, which needs the hidden
+        // system slider — install it only while this screen is open.
+        .onAppear { triggerController.beginSystemVolumeControl() }
+        .onDisappear { triggerController.endSystemVolumeControl() }
     }
 }
 
