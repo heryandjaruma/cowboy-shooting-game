@@ -6,6 +6,7 @@
 //
 
 import SwiftUI
+import Lottie
 
 struct MainMenuView: View {
     @State private var connection = GameConnectionManager()
@@ -26,7 +27,14 @@ struct MainMenuView: View {
                     .resizable()
                     .scaledToFill()
                     .ignoresSafeArea()
-
+                
+                LottieView(animation:.named("tumbleweed"))
+                    .looping()
+                    .animationSpeed(0.7)
+                    .resizable()
+                    .frame(width: 300,height: 300)
+                    .offset(y:170)
+                           
                 VStack(spacing: 16) {
                     TitleView()
                         .padding(.top, 20)
