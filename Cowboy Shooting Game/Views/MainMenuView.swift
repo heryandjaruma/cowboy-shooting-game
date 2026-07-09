@@ -119,6 +119,10 @@ struct MainMenuView: View {
                 )
             }
         }
+        .onAppear {
+            MusicManager.shared.attach(to: connection)
+            MusicManager.shared.play(.lobby)
+        }
     }
 }
 
