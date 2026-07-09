@@ -95,6 +95,7 @@ struct JoinGameView: View {
     @StateObject private var controller: JoinGameController
     @Environment(\.dismiss) private var dismiss
     @State private var navigateToConfirmation = false
+    @State private var returnToMenuOnDismiss = false
 
     init(connection: GameConnectionManager) {
         _connection = ObservedObject(wrappedValue: connection)
@@ -159,12 +160,18 @@ struct JoinGameView: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToConfirmation, onDismiss: {
-            // Back from the pre-duel screen without a match — browse again.
-            if case .connected = connection.state {} else {
+            if returnToMenuOnDismiss {
+                // Connection was lost mid-duel — unwind to the main menu.
+                dismiss()
+            } else if case .connected = connection.state {} else {
+                // Back from the pre-duel screen without a match — browse again.
                 controller.start()
             }
         }) {
-            ConfirmationScreenView(connection: connection)
+            ConfirmationScreenView(connection: connection, onReturnToMenu: {
+                returnToMenuOnDismiss = true
+                navigateToConfirmation = false
+            })
         }
     }
 }

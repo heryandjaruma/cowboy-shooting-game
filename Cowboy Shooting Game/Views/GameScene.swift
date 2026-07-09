@@ -25,6 +25,7 @@ class GameScene: SKScene {
     private var countdownNode: SKSpriteNode!  // num3 / num2 / num1 images
     private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
     private var resultNode: SKSpriteNode!      // "win" / "lose" result image
+    private var matchSummaryLabel: SKLabelNode! // final lives tally under victory/game over
     private var bangNode: SKSpriteNode!        // shot-effect image
     
     private var localSceneReady = false
@@ -66,6 +67,7 @@ class GameScene: SKScene {
         setupCountdownNode()
         setupFireNode()
         setupResultNode()
+        setupMatchSummaryLabel()
         setupBangNode()
         setupHolsterHintLabel()
 
@@ -285,7 +287,10 @@ class GameScene: SKScene {
             SKAction.scale(to: 0.69, duration: 0.15),
             SKAction.scale(to: 0.42, duration: 0.10)
         ]))
-        
+
+        matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
+        matchSummaryLabel.alpha = 1.0
+
         showReturnToMenuPrompt()
     }
     
@@ -550,6 +555,18 @@ class GameScene: SKScene {
         resultNode.zPosition = 13
         resultNode.alpha = 0.0
         addChild(resultNode)
+    }
+
+    private func setupMatchSummaryLabel() {
+        matchSummaryLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
+        matchSummaryLabel.fontSize = 28
+        matchSummaryLabel.fontColor = .white
+        matchSummaryLabel.verticalAlignmentMode = .center
+        matchSummaryLabel.horizontalAlignmentMode = .center
+        matchSummaryLabel.position = CGPoint(x: 0, y: -210)  // between the result image and the return prompt
+        matchSummaryLabel.zPosition = 13
+        matchSummaryLabel.alpha = 0.0
+        addChild(matchSummaryLabel)
     }
 
     private func setupHolsterHintLabel() {
