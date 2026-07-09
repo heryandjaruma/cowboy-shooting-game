@@ -15,14 +15,17 @@ class GameScene: SKScene {
     var shotController: ShotController = ShotController()
     var countdownController: CountdownController = CountdownController()
     var matchController: MatchController = MatchController()
+    var drawPoseController: DrawPoseController = DrawPoseController()
     
     private var hearts: [SKSpriteNode] = []
     
     private var dimmingNode: SKSpriteNode!
+    private var holsterHintLabel: SKLabelNode!  // pose-gate coaching text
     private var countdownLabel: SKLabelNode!
     private var countdownNode: SKSpriteNode!  // num3 / num2 / num1 images
     private var fireNode: SKSpriteNode!        // "fire" draw-prompt image
     private var resultNode: SKSpriteNode!      // "win" / "lose" result image
+    private var matchSummaryLabel: SKLabelNode! // final lives tally under victory/game over
     private var bangNode: SKSpriteNode!        // shot-effect image
     
     private var localSceneReady = false
@@ -40,6 +43,11 @@ class GameScene: SKScene {
     // Hardware integration properties
     private var hapticEngine: CHHapticEngine?
     private var audioPlayer: AVAudioPlayer?
+    private var tickPlayer: AVAudioPlayer?
+    private var jammedPlayer: AVAudioPlayer?
+    private var voicePlayer: AVAudioPlayer?       // announcer lines — one channel, a new line replaces the old
+    private var firePromptPlayer: AVAudioPlayer?  // FireSFX at window open
+    private var voiceCompletionWorkItem: DispatchWorkItem?
     private var isFiringFlashlight = false
     
     // MARK: - Lifecycle
@@ -55,21 +63,24 @@ class GameScene: SKScene {
         
         setupBackground()
         setupGun()
-        setupPlayerUI()
+//        setupPlayerUI()
         setupHealthUI()
         setupDimmingLayer()
         setupCountdownLabel()
         setupCountdownNode()
         setupFireNode()
         setupResultNode()
+        setupMatchSummaryLabel()
         setupBangNode()
-        
+        setupHolsterHintLabel()
+
         prepareHaptics()
         setupAudioSession()
-        
+
         observeControllers()
         setupNetworking()
-        
+
+        drawPoseController.start()
         triggerController.reactivate()
 
         triggerController.onTrigger = { [weak self] _ in
@@ -81,7 +92,11 @@ class GameScene: SKScene {
     override func willMove(from view: SKView) {
         super.willMove(from: view)
 
+        voiceCompletionWorkItem?.cancel()
+        voiceCompletionWorkItem = nil
         triggerController.onTrigger = nil
+        triggerController.disable()
+        drawPoseController.stop()
     }
     
     // MARK: - Controller Observation
@@ -121,9 +136,43 @@ class GameScene: SKScene {
                 }
             }
             .store(in: &cancellables)
+
+        // Pose gate. @Published emits on willSet, so hop through the main queue
+        // once to read the controller's fully-updated state in the handler.
+        drawPoseController.$pose
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshHolsterHint(phase: self.countdownController.phase)
+            }
+            .store(in: &cancellables)
+
+        drawPoseController.$isArmed
+            .removeDuplicates()
+            .receive(on: DispatchQueue.main)
+            .sink { [weak self] _ in
+                guard let self else { return }
+                self.refreshHolsterHint(phase: self.countdownController.phase)
+            }
+            .store(in: &cancellables)
     }
     
     private func handlePhaseChange(_ phase: CountdownController.Phase) {
+        switch phase {
+        case .notReady, .waiting:
+            drawPoseController.endRound()
+        case .counting:
+            break
+        case .fire:
+            // Judged at the exact window-open instant: out of the holster now
+            // is a false start and the player must re-holster to arm.
+            drawPoseController.beginRound()
+            playFirePromptAudio()
+            playDrawSignalHaptic() // felt even with the phone held at the hip
+        }
+        refreshHolsterHint(phase: phase)
+
         switch phase {
         case .notReady:
             dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.2))
@@ -159,19 +208,11 @@ class GameScene: SKScene {
             let numTex = SKTexture(imageNamed: "num\(n)")
             numTex.filteringMode = .nearest
             countdownNode.texture = numTex
-            
-            let targetHeight: CGFloat = 220
-            let aspect = numTex.size().width / numTex.size().height
-            countdownNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-            
-            countdownNode.removeAllActions()
-            countdownNode.setScale(0.2)
-            countdownNode.alpha = 1.0
-            countdownNode.run(SKAction.sequence([
-                SKAction.scale(to: 0.69, duration: 0.12),
-                SKAction.scale(to: 0.42, duration: 0.08)
-            ]))
-            
+            countdownNode.size = overlaySize(for: numTex, height: 92)
+            popIn(countdownNode)
+            playCountdownTickAudio()
+            playCountdownTickHaptic()
+
         case .fire:
             // Lift the dimming overlay and hide number nodes
             countdownLabel.removeAllActions(); countdownLabel.run(SKAction.fadeOut(withDuration: 0.15))
@@ -179,13 +220,16 @@ class GameScene: SKScene {
             resultNode.removeAllActions();     resultNode.alpha = 0.0
             dimmingNode.run(SKAction.fadeOut(withDuration: 0.25))
             // Show fire image with a looping pulse
+            if let fireTex = fireNode.texture {
+                fireNode.size = overlaySize(for: fireTex, height: 100)
+            }
             fireNode.removeAllActions()
-            fireNode.setScale(0.2)
+            fireNode.setScale(0.6)
             fireNode.alpha = 1.0
-            let grow = SKAction.scale(to: 1.05, duration: 0.18)
+            let grow = SKAction.scale(to: 1.0, duration: 0.18)
             let pulse = SKAction.sequence([
-                SKAction.scale(to: 0.42, duration: 0.35),
-                SKAction.scale(to: 0.69, duration: 0.35)
+                SKAction.scale(to: 0.8, duration: 0.35),
+                SKAction.scale(to: 1.0, duration: 0.35)
             ])
             fireNode.run(SKAction.sequence([grow, SKAction.repeatForever(pulse)]))
         }
@@ -193,6 +237,7 @@ class GameScene: SKScene {
     
     private func handleOutcome(_ outcome: ShotController.Outcome) {
         // Stop any in-progress animations
+        hideHolsterHint()
         fireNode.removeAllActions();   fireNode.run(SKAction.fadeOut(withDuration: 0.15))
         countdownNode.removeAllActions(); countdownNode.alpha = 0.0
         countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
@@ -201,21 +246,15 @@ class GameScene: SKScene {
         
         let resultTex = SKTexture(imageNamed: outcome == .winner ? "win" : "lose")
         resultTex.filteringMode = .nearest
-        
-        let targetHeight: CGFloat = 260
-        let aspect = resultTex.size().width / resultTex.size().height
         resultNode.texture = resultTex
-        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-        
-        resultNode.setScale(0.2)
-        resultNode.alpha = 1.0
-        resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 0.69, duration: 0.15),
-            SKAction.scale(to: 0.42, duration: 0.10)
-        ]))
-        
+        resultNode.size = overlaySize(for: resultTex, height: 110)
+        popIn(resultNode)
+
+        playVoiceLine(outcome == .winner ? "BullseyeSFX" : "OutdrawnSFX")
         if outcome == .loser {
             playGetHitHaptic()
+        } else {
+            playRoundWonHaptic()
         }
     }
     
@@ -226,22 +265,20 @@ class GameScene: SKScene {
     }
     
     private func showMatchOver(won: Bool) {
-        resultNode.removeAllActions()
         let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
         tex.filteringMode = .nearest
-        
-        let targetHeight: CGFloat = 400
-        let aspect = tex.size().width / tex.size().height
         resultNode.texture = tex
-        resultNode.size = CGSize(width: targetHeight * aspect, height: targetHeight)
-        
-        resultNode.setScale(0.2)
-        resultNode.alpha = 1.0
-        resultNode.run(SKAction.sequence([
-            SKAction.scale(to: 0.69, duration: 0.15),
-            SKAction.scale(to: 0.42, duration: 0.10)
-        ]))
-        
+        resultNode.size = overlaySize(for: tex, height: 170)
+        popIn(resultNode)
+
+        // Verdict call over the game-over music bed. The music rides the Music
+        // slider and the host's sync heartbeat keeps both devices aligned.
+        playVoiceLine(won ? "VictorySFX" : "GameOverSFX")
+        MusicManager.shared.play(.gameOver)
+
+        // matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
+        // matchSummaryLabel.alpha = 1.0
+
         showReturnToMenuPrompt()
     }
     
@@ -262,7 +299,7 @@ class GameScene: SKScene {
     private func showReturnToMenuPrompt() {
         countdownLabel.removeAllActions()
         countdownLabel.position = CGPoint(x: 0, y: -280)   // below the result image
-        countdownLabel.text = "Tap to return to menu"
+        countdownLabel.text = "Tap to return to lobby"
         countdownLabel.fontSize = 36
         countdownLabel.fontColor = .white
         countdownLabel.setScale(1.0)
@@ -271,6 +308,38 @@ class GameScene: SKScene {
             .fadeAlpha(to: 0.3, duration: 0.6),
             .fadeAlpha(to: 1.0, duration: 0.6)
         ])))
+    }
+
+    // MARK: - Overlay sizing
+
+    /// Aspect-fit `texture` into a box `height` points tall, capped at 85% of
+    /// the scene width. An overlay's on-screen size must always come from here —
+    /// never from the texture's native size, which is just the PNG's pixel count
+    /// and silently changes layout whenever an asset is re-exported (victory.png
+    /// is 500×157: height-only sizing rendered it 535pt wide, off both screen edges).
+    private func overlaySize(for texture: SKTexture, height: CGFloat) -> CGSize {
+        let tex = texture.size()
+        var h = height
+        var w = h * (tex.width / tex.height)
+        let maxWidth = size.width * 0.85
+        if w > maxWidth {
+            h *= maxWidth / w
+            w = maxWidth
+        }
+        return CGSize(width: w, height: h)
+    }
+
+    /// Shared pop-in for overlay sprites. Scale settles at exactly 1.0, so a
+    /// node's `size` IS what appears on screen (previously everything settled
+    /// at 0.42×, so no sizing constant in this file matched the rendered result).
+    private func popIn(_ node: SKSpriteNode) {
+        node.removeAllActions()
+        node.setScale(0.6)
+        node.alpha = 1.0
+        node.run(SKAction.sequence([
+            SKAction.scale(to: 1.15, duration: 0.12),
+            SKAction.scale(to: 1.0, duration: 0.08)
+        ]))
     }
     
     
@@ -322,9 +391,15 @@ class GameScene: SKScene {
             opponent = "opponent"
         }
         print("[\(role)] \(connection.myName) and \(opponent) both reached the scene.")
-        
-        // Entering the game scene implies readiness — kick off the countdown.
-        countdownController.pressReady()
+
+        // Entering the game scene implies readiness — but the announcer sets
+        // the stage first: "The duel begins" → beat → "Ready for showdown" →
+        // ready up. The countdown can't start until both devices finish this.
+        playVoiceLine("TheDuelBeginsSFX") { [weak self] in
+            DispatchQueue.main.asyncAfter(deadline: .now() + 0.6) {
+                self?.startRoundWithShowdownCall()
+            }
+        }
     }
     
     // MARK: - Touch Handling
@@ -336,6 +411,7 @@ class GameScene: SKScene {
         }
         if matchController.matchPhase == .awaitingContinue {
             matchController.continueToNextRound()
+            startRoundWithShowdownCall()
             return
         }
         // Intentionally no fire-handling here.
@@ -354,7 +430,27 @@ class GameScene: SKScene {
               shotController.outcome == nil else {
             return
         }
+        // Pose gate: the shot only counts from a raised gun after a clean
+        // (or corrected) holster start — see DrawPoseController.
+        guard drawPoseController.canFire else {
+            dryFire()
+            return
+        }
         shotController.fire()
+    }
+
+    /// Trigger pulled while not in a valid draw pose — the hammer just clicks.
+    private func dryFire() {
+        playGunJammedAudio()
+        playDryFireHaptic()
+        // Nudge the FIRE prompt sideways so the blocked shot is visible too.
+        let shake = SKAction.sequence([
+            .moveBy(x: 12, y: 0, duration: 0.04),
+            .moveBy(x: -24, y: 0, duration: 0.06),
+            .moveBy(x: 12, y: 0, duration: 0.04),
+            .move(to: CGPoint(x: 0, y: 0), duration: 0.02)
+        ])
+        fireNode.run(shake, withKey: "dryFireShake")
     }
     
     // MARK: - Scene Setup Methods
@@ -487,6 +583,84 @@ class GameScene: SKScene {
         resultNode.alpha = 0.0
         addChild(resultNode)
     }
+
+    private func setupMatchSummaryLabel() {
+        matchSummaryLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
+        matchSummaryLabel.fontSize = 28
+        matchSummaryLabel.fontColor = .white
+        matchSummaryLabel.verticalAlignmentMode = .center
+        matchSummaryLabel.horizontalAlignmentMode = .center
+        matchSummaryLabel.position = CGPoint(x: 0, y: -210)  // between the result image and the return prompt
+        matchSummaryLabel.zPosition = 13
+        matchSummaryLabel.alpha = 0.0
+        addChild(matchSummaryLabel)
+    }
+
+    private func setupHolsterHintLabel() {
+        holsterHintLabel = SKLabelNode(fontNamed: "HelveticaNeue-Bold")
+        holsterHintLabel.fontSize = 26
+        holsterHintLabel.verticalAlignmentMode = .center
+        holsterHintLabel.horizontalAlignmentMode = .center
+        holsterHintLabel.position = CGPoint(x: 0, y: -self.size.height / 2 + 60)
+        holsterHintLabel.zPosition = 11
+        holsterHintLabel.alpha = 0.0
+        addChild(holsterHintLabel)
+    }
+
+    // MARK: - Holster hint (pose-gate coaching)
+
+    /// Bottom-of-screen coaching: holster guidance while the countdown runs,
+    /// a false-start warning during the firing window, nothing once the round
+    /// is decided or when this device can't sense motion.
+    private func refreshHolsterHint(phase: CountdownController.Phase) {
+        guard drawPoseController.isAvailable,
+              shotController.outcome == nil, !shotController.didFire,
+              matchController.matchPhase == .playing else {
+            hideHolsterHint()
+            return
+        }
+        switch phase {
+        case .notReady:
+            hideHolsterHint()
+        case .waiting, .counting:
+            if drawPoseController.pose == .holstered {
+                showHolsterHint("HOLSTERED... STEADY",
+                                color: SKColor(red: 0.45, green: 0.85, blue: 0.45, alpha: 1.0),
+                                pulse: false)
+            } else {
+                showHolsterHint("HOLSTER! TIP YOUR GUN DOWN",
+                                color: .orange, pulse: true)
+            }
+        case .fire:
+            if drawPoseController.isArmed {
+                hideHolsterHint()
+            } else {
+                showHolsterHint("TOO SOON! RE-HOLSTER!",
+                                color: .red, pulse: true)
+            }
+        }
+    }
+
+    private func showHolsterHint(_ text: String, color: SKColor, pulse: Bool) {
+        // Pose updates stream in continuously; don't restart the animation
+        // unless the message actually changed.
+        guard holsterHintLabel.text != text || holsterHintLabel.alpha == 0 else { return }
+        holsterHintLabel.removeAllActions()
+        holsterHintLabel.text = text
+        holsterHintLabel.fontColor = color
+        holsterHintLabel.alpha = 1.0
+        if pulse {
+            holsterHintLabel.run(.repeatForever(.sequence([
+                .fadeAlpha(to: 0.35, duration: 0.45),
+                .fadeAlpha(to: 1.0, duration: 0.45)
+            ])))
+        }
+    }
+
+    private func hideHolsterHint() {
+        holsterHintLabel.removeAllActions()
+        holsterHintLabel.alpha = 0.0
+    }
     
     // MARK: - Hardware Integration (Audio, Flashlight, Haptics)
     
@@ -548,14 +722,108 @@ class GameScene: SKScene {
         }
     }
     
+    // MARK: - Announcer voice lines
+
+    /// Play one announcer line (BullseyeSFX, ReadyForShowdownSFX, …) on the
+    /// single voice channel, replacing whatever line was still playing.
+    /// `completion` fires when the line ends — and also when the file is
+    /// missing or fails, so the duel flow can never stall on audio.
+    private func playVoiceLine(_ resource: String, then completion: (() -> Void)? = nil) {
+        voiceCompletionWorkItem?.cancel()
+        voiceCompletionWorkItem = nil
+        voicePlayer?.stop()
+
+        let url = Bundle.main.url(forResource: resource, withExtension: "mp3")
+            ?? Bundle.main.url(forResource: resource, withExtension: "m4a")
+        guard let url else {
+            print("Missing voice line: \(resource)")
+            completion?()
+            return
+        }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.volume = AppSettings.sfxVolume
+            player.prepareToPlay()
+            player.play()
+            voicePlayer = player
+            if let completion {
+                let item = DispatchWorkItem(block: completion)
+                voiceCompletionWorkItem = item
+                DispatchQueue.main.asyncAfter(deadline: .now() + player.duration, execute: item)
+            }
+        } catch {
+            print("Failed to play voice line \(resource): \(error.localizedDescription)")
+            completion?()
+        }
+    }
+
+    /// "Ready for showdown…" then this device readies up. The countdown still
+    /// starts only when BOTH devices get here (the both-ready gate), which is
+    /// what keeps the shared schedule in sync.
+    private func startRoundWithShowdownCall() {
+        playVoiceLine("ReadyForShowdownSFX") { [weak self] in
+            self?.countdownController.pressReady()
+        }
+    }
+
+    // MARK: - Volume helpers
+
+    private func playCountdownTickAudio() {
+        guard let url = Bundle.main.url(forResource: "CountdownTick", withExtension: "m4a") else {
+            print("Could not find CountdownTick.m4a")
+            return
+        }
+        do {
+            tickPlayer = try AVAudioPlayer(contentsOf: url)
+            tickPlayer?.volume = AppSettings.sfxVolume
+            tickPlayer?.prepareToPlay()
+            tickPlayer?.play()
+        } catch {
+            print("Failed to play countdown tick audio: \(error.localizedDescription)")
+        }
+    }
+
+    private func playGunJammedAudio() {
+        guard let url = Bundle.main.url(forResource: "GunJammed", withExtension: "m4a") else {
+            print("Could not find GunJammed.m4a")
+            return
+        }
+        do {
+            jammedPlayer = try AVAudioPlayer(contentsOf: url)
+            jammedPlayer?.volume = AppSettings.sfxVolume
+            jammedPlayer?.prepareToPlay()
+            jammedPlayer?.play()
+        } catch {
+            print("Failed to play gun jammed audio: \(error.localizedDescription)")
+        }
+    }
+
+    /// Short "FIRE!" sting the instant the firing window opens. Both devices
+    /// open the window at the same synced instant, so this is heard together.
+    private func playFirePromptAudio() {
+        guard let url = Bundle.main.url(forResource: "FireSFX", withExtension: "m4a") else {
+            print("Could not find FireSFX.m4a")
+            return
+        }
+        do {
+            firePromptPlayer = try AVAudioPlayer(contentsOf: url)
+            firePromptPlayer?.volume = AppSettings.sfxVolume
+            firePromptPlayer?.prepareToPlay()
+            firePromptPlayer?.play()
+        } catch {
+            print("Failed to play fire prompt audio: \(error.localizedDescription)")
+        }
+    }
+
     private func playGunshotAudio() {
         guard let soundAsset = NSDataAsset(name: "rayne-mixedgun") else {
             print("Could not find the audio asset in the catalog.")
             return
         }
-        
+
         do {
             audioPlayer = try AVAudioPlayer(data: soundAsset.data)
+            audioPlayer?.volume = AppSettings.gunshotVolume
             audioPlayer?.prepareToPlay()
             audioPlayer?.play()
         } catch {
@@ -591,20 +859,127 @@ class GameScene: SKScene {
         }
     }
     
-    private func playGetHitHaptic() {
+    /// Sharp little click for a trigger pull outside a valid draw pose.
+    private func playDryFireHaptic() {
         guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
-        
-        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0)
-        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.1)
-        
-        let event = CHHapticEvent(eventType: .hapticContinuous, parameters: [intensity, sharpness], relativeTime: 0, duration: 0.4)
-        
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
         do {
             let pattern = try CHHapticPattern(events: [event], parameters: [])
             let player = try hapticEngine?.makePlayer(with: pattern)
             try player?.start(atTime: 0)
         } catch {
+            print("Failed to play dry fire haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// "DRAW!" — the firing window just opened. A hard double-kick with a
+    /// rumble tail, unmistakable from the single countdown ticks even with the
+    /// phone holstered at the hip rather than being watched.
+    private func playDrawSignalHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let events = [
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)],
+                          relativeTime: 0),
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.9)],
+                          relativeTime: 0.09),
+            CHHapticEvent(eventType: .hapticContinuous,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.3)],
+                          relativeTime: 0.18,
+                          duration: 0.3)
+        ]
+
+        do {
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play draw signal haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Short firm tick on each countdown number (3, 2, 1).
+    private func playCountdownTickHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let intensity = CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.8)
+        let sharpness = CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.6)
+
+        let event = CHHapticEvent(eventType: .hapticTransient, parameters: [intensity, sharpness], relativeTime: 0)
+
+        do {
+            let pattern = try CHHapticPattern(events: [event], parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play countdown tick haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Got shot: one hard impact, then a heavy rumble that drains away — the
+    /// losing side of the round, felt as clearly as it's seen.
+    private func playGetHitHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let events = [
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.7)],
+                          relativeTime: 0),
+            CHHapticEvent(eventType: .hapticContinuous,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 1.0),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.05)],
+                          relativeTime: 0.05,
+                          duration: 0.6)
+        ]
+        // Fade the rumble out over its duration so it feels like collapsing,
+        // not a flat buzz.
+        let decay = CHHapticParameterCurve(
+            parameterID: .hapticIntensityControl,
+            controlPoints: [
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0.05, value: 1.0),
+                CHHapticParameterCurve.ControlPoint(relativeTime: 0.65, value: 0.0)
+            ],
+            relativeTime: 0
+        )
+
+        do {
+            let pattern = try CHHapticPattern(events: events, parameterCurves: [decay])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
             print("Failed to play get hit haptic: \(error.localizedDescription)")
+        }
+    }
+
+    /// Won the round: three quick, crisp taps rising in strength — light and
+    /// celebratory, the opposite feel of the loser's heavy hit.
+    private func playRoundWonHaptic() {
+        guard CHHapticEngine.capabilitiesForHardware().supportsHaptics else { return }
+
+        let events = [0.0, 0.12, 0.24].enumerated().map { index, time in
+            CHHapticEvent(eventType: .hapticTransient,
+                          parameters: [CHHapticEventParameter(parameterID: .hapticIntensity, value: 0.5 + 0.25 * Float(index)),
+                                       CHHapticEventParameter(parameterID: .hapticSharpness, value: 0.8 + 0.1 * Float(index))],
+                          relativeTime: time)
+        }
+
+        do {
+            let pattern = try CHHapticPattern(events: events, parameters: [])
+            let player = try hapticEngine?.makePlayer(with: pattern)
+            try player?.start(atTime: 0)
+        } catch {
+            print("Failed to play round won haptic: \(error.localizedDescription)")
         }
     }
 }

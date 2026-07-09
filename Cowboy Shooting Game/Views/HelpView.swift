@@ -9,13 +9,37 @@ import SwiftUI
 
 struct HelpView: View {
     @Environment(\.dismiss) private var dismiss
-
-    private let steps: [String] = [
-        "Press “Create game” to host a new game, or you can join a host's game with “Join game” and find any game you wish to join.",
-        "Before pressing “Ready,” take a distance between you and the other player as you both face opposite each other.",
-        "After receiving the signal to fire, quickly turn your body facing the other player and press the volume button to shoot. The round ends and both players proceed to the next round until game ends.",
-        "One game consists of 3-5 rounds. The winner of the game is the player whose lives are still intact."
+    // The app overrides the language via `.environment(\.locale, …)`. `String(localized:)`
+    // ignores that, so we read it here and resolve each step against it explicitly.
+    @Environment(\.locale) private var locale
+    private let steps: [LocalizedStringResource] = [
+        "Press **“Create game”** to host a new game, or you can join a host's game with **“Join game”** and find any game you wish to join.",
+        "Before pressing **“Ready,”** take a distance between you and the other player. While this is not required for gameplay, it is advised to **avoid physical** contact with the other player.",
+        "After receiving the signal to fire, quickly **flick your phone upwards**. Raising your whole arm or flicking up your wrist work as long as the **top or bottom** side of your phone is pointing towards the opponent.",
+        "Press either one of your **volume button** to fire. The fastest slinger wins.",
+        "Each player has **3 lives**. The last one standing will take the match."
     ]
+
+    private func highlighted(_ resource: LocalizedStringResource) -> AttributedString {
+        // Resolve against the in-app locale, not the process default, so the tutorial
+        // follows the language chosen in Settings like the rest of the UI.
+        var resource = resource
+        resource.locale = locale
+        let raw = String(localized: resource)
+
+        var attributed = (try? AttributedString(
+            markdown: raw,
+            options: .init(interpretedSyntax: .inlineOnlyPreservingWhitespace)
+        )) ?? AttributedString(raw)
+        attributed.font = Font.bodyCSG
+        attributed.foregroundColor = Color.ternaryCSG.opacity(0.7)
+
+        for run in attributed.runs where run.inlinePresentationIntent?.contains(.stronglyEmphasized) == true {
+            attributed[run.range].font = Font.bodyCSG
+            attributed[run.range].foregroundColor = Color.ternaryCSG.opacity(1.0)
+        }
+        return attributed
+    }
 
     var body: some View {
         ZStack(alignment: .top) {
@@ -39,7 +63,7 @@ struct HelpView: View {
                                     .font(.bodyCSG)
                                     .foregroundColor(Color.ternaryCSG)
 
-                                Text(step)
+                                Text(highlighted(step))
                                     .font(.bodyCSG)
                                     .foregroundColor(Color.ternaryCSG)
                                     .multilineTextAlignment(.leading)

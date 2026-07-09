@@ -8,7 +8,7 @@
 import SwiftUI
 
 private struct SettingRow: View {
-    let label: String
+    let label: LocalizedStringKey
     let options: [String]
     @Binding var selection: Int
     private var value: String {
@@ -75,7 +75,7 @@ private struct SettingRow: View {
 }
 
 private struct SettingSliderRow: View {
-    let label: String
+    let label: LocalizedStringKey
     @Binding var value: Double
     var range: ClosedRange<Double> = 0...1
 
@@ -115,6 +115,10 @@ struct SettingsView: View {
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = true
 
+    @AppStorage(AppSettings.musicVolumeKey)   private var musicVolume   = 1.0
+    @AppStorage(AppSettings.sfxVolumeKey)     private var sfxVolume     = 1.0
+    @AppStorage(AppSettings.gunshotVolumeKey) private var gunshotVolume = 1.0
+
     private let grayscaleOptions = ["OFF", "ON"]
 
     private var languageIndex: Binding<Int> {
@@ -141,30 +145,43 @@ struct SettingsView: View {
                 .fill(Color.black.opacity(0.5))
                 .ignoresSafeArea(edges: .all)
 
-            VStack(spacing: 20) {
+            VStack(spacing: 0) {
                 ScreenTopBar(title: "SETTINGS") {
                     dismiss()
                 }
+                .padding(.top, 20)
 
-                VStack(spacing: 16) {
-                    SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
-                    SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
+                ScrollView {
+                    VStack(spacing: 16) {
+                        SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
+                        SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
 
-                    SettingSliderRow(
-                        label: "Gunshot Noise",
-                        value: Binding(
-                            get: { Double(triggerController.state.baselineTrigger) },
-                            set: { triggerController.updateBaseline(Float($0)) }
-                        ),
-                        range: 0.05...0.95
-                    )
+                        SettingSliderRow(
+                            label: "Master",
+                            value: Binding(
+                                get: { Double(triggerController.state.baselineTrigger) },
+                                set: { triggerController.updateBaseline(Float($0)) }
+                            ),
+                            range: 0.05...0.95
+                        )
+
+                        SettingSliderRow(label: "Music",   value: $musicVolume)
+                        SettingSliderRow(label: "SFX",     value: $sfxVolume)
+                        SettingSliderRow(label: "Gunshot", value: $gunshotVolume)
+                    }
+                    .padding(.horizontal, 16)
+                    .padding(.vertical, 20)
                 }
-                .padding(.horizontal, 16)
-
-                Spacer()
-            }.padding(.top,20)
+            }
         }
         .toolbar(.hidden, for: .navigationBar)
+        .onChange(of: musicVolume) { _, _ in
+            MusicManager.shared.applyMusicVolume()
+        }
+        // The Master slider sets the DEVICE volume, which needs the hidden
+        // system slider — install it only while this screen is open.
+        .onAppear { triggerController.beginSystemVolumeControl() }
+        .onDisappear { triggerController.endSystemVolumeControl() }
     }
 }
 

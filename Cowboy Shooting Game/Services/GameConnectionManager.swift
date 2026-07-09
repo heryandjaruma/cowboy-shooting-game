@@ -89,6 +89,10 @@ final class GameConnectionManager: ObservableObject {
         "Wild Bill", "Ghost Rider", "Ace", "Maverick", "Tumbleweed"
     ]
 
+    /// Read-only view of the Wild-West aliases, for UIs that let the player cycle
+    /// through suggestions (e.g. the name prompt's "Random" button).
+    static var suggestedNames: [String] { randomNames }
+
     /// Human-readable name advertised to / shown by the other device.
     ///
     /// Prefers the name the player typed; otherwise returns the stable
