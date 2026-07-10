@@ -165,6 +165,7 @@ class DrawPoseTestScene: SKScene {
     override func touchesBegan(_ touches: Set<UITouch>, with event: UIEvent?) {
         guard let touch = touches.first else { return }
         if nodes(at: touch.location(in: self)).contains(where: { $0.name == "exitButton" }) {
+            triggerController.disable()
             onExit?()
             return
         }

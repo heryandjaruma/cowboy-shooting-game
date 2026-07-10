@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GameKit
+import Lottie
 
 struct MainMenuView: View {
     @EnvironmentObject private var gameCenterManager: GameCenterManager
@@ -29,7 +30,14 @@ struct MainMenuView: View {
                     .resizable()
                     .scaledToFill()
                     .ignoresSafeArea()
-
+                
+                LottieView(animation:.named("tumbleweed"))
+                    .looping()
+                    .animationSpeed(0.7)
+                    .resizable()
+                    .frame(width: 300,height: 300)
+                    .offset(y:170)
+                           
                 VStack(spacing: 16) {
                     TitleView()
                         .padding(.top, 20)

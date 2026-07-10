@@ -11,34 +11,50 @@ import Combine
 
 @main
 struct Cowboy_Shooting_GameApp: App {
-    // Stuff from settings go here. Defaults is the hardcoded value
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = false
     @AppStorage(AppSettings.onboardingCompleteKey) private var onboardingComplete = false
-    
-    // GameKit stuff
+
     @StateObject private var gameCenterManager = GameCenterManager.shared
 
-    // Ensures authentication happens every boot-upa
+    // Splash screen state — resets every app launch since it's not persisted
+    @State private var showSplash = true
+
     init() {
         GameCenterManager.shared.authenticatePlayer()
     }
 
     var body: some Scene {
         WindowGroup {
-            Group {
-                if onboardingComplete {
-                    MainMenuView()
-                } else {
-                    OnboardingView(onFinished: { onboardingComplete = true })
+            ZStack {
+                Group {
+                    if onboardingComplete {
+                        MainMenuView()
+                    } else {
+                        OnboardingView(onFinished: { onboardingComplete = true })
+                    }
+                }
+                .environmentObject(gameCenterManager)
+                .environment(\.locale, Locale(identifier: languageCode))
+                .grayscale(grayscaleEnabled ? 1.0 : 0.0)
+                .sheet(isPresented: $gameCenterManager.showAuthViewController) {
+                    if let viewController = gameCenterManager.authViewController {
+                        GameCenterAuthView(viewController: viewController)
+                    }
+                }
+
+                if showSplash {
+                    SplashScreenView()
+                        .transition(.opacity)
+                        .zIndex(1)
                 }
             }
-            .environmentObject(gameCenterManager)
-            .environment(\.locale, Locale(identifier: languageCode))
-            .grayscale(grayscaleEnabled ? 1.0 : 0.0)
-            .sheet(isPresented: $gameCenterManager.showAuthViewController) {
-                if let viewController = gameCenterManager.authViewController {
-                    GameCenterAuthView(viewController: viewController)
+            .onAppear {
+                // Show splash for a fixed duration, then fade it out
+                DispatchQueue.main.asyncAfter(deadline: .now() + 1.5) {
+                    withAnimation(.easeOut(duration: 0.4)) {
+                        showSplash = false
+                    }
                 }
             }
         }
