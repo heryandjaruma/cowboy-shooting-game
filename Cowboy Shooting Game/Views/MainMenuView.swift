@@ -7,6 +7,7 @@
 
 import SwiftUI
 import GameKit
+import Lottie
 
 struct MainMenuView: View {
     @EnvironmentObject private var gameCenterManager: GameCenterManager
