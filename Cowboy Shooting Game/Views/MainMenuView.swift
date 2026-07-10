@@ -19,7 +19,8 @@ struct MainMenuView: View {
 
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
-        MenuOption(targetDestination: .joinGame)
+        MenuOption(targetDestination: .joinGame),
+        MenuOption(targetDestination: .spectateGame)
     ]
 
     var body: some View {
@@ -121,6 +122,8 @@ struct MainMenuView: View {
                     CreateGameView(connection: connection)
                 case .joinGame:
                     JoinGameView(connection: connection)
+                case .spectateGame:
+                    SpectateView()
                 case .helpGame:
                     HelpView()
                 case .settingsGame:
