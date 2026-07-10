@@ -129,15 +129,20 @@ struct SpectateView: View {
         .padding(.horizontal, 16)
     }
 
-    /// Host on the left, challenger on the right — names and hearts.
+    /// Host on the left, challenger on the right — names and hearts. Once a
+    /// player hits 0 lives the duel is decided, so each side gets its verdict
+    /// artwork; a rematch or new challenger re-broadcasts 3-3 and clears it.
     private func duelBoard(_ snapshot: SpectatorSnapshot) -> some View {
-        HStack(spacing: 24) {
-            playerColumn(name: snapshot.hostName, lives: snapshot.hostLives)
+        let matchOver = snapshot.hostLives == 0 || snapshot.joinerLives == 0
+        return HStack(spacing: 24) {
+            playerColumn(name: snapshot.hostName, lives: snapshot.hostLives,
+                         won: matchOver ? snapshot.hostLives > 0 : nil)
             Text("VS")
                 .font(.headingCSG)
                 .foregroundStyle(.white)
             playerColumn(name: snapshot.joinerName.isEmpty ? "Waiting…" : snapshot.joinerName,
-                         lives: snapshot.joinerLives)
+                         lives: snapshot.joinerLives,
+                         won: matchOver ? snapshot.joinerLives > 0 : nil)
         }
         .padding(24)
         .background(
@@ -146,10 +151,20 @@ struct SpectateView: View {
                 .stroke(Color.ternaryCSG, lineWidth: 4)
         )
         .padding(.horizontal, 16)
+        .animation(.spring(response: 0.4, dampingFraction: 0.6), value: snapshot)
     }
 
-    private func playerColumn(name: String, lives: Int) -> some View {
+    /// `won` is nil while the duel is still running.
+    private func playerColumn(name: String, lives: Int, won: Bool?) -> some View {
         VStack(spacing: 12) {
+            if let won {
+                Image(won ? "victory" : "game_over")
+                    .resizable()
+                    .interpolation(.none)
+                    .scaledToFit()
+                    .frame(height: 44)
+                    .transition(.scale.combined(with: .opacity))
+            }
             Text(name)
                 .font(.headingCSG)
                 .foregroundColor(Color.ternaryCSG)
