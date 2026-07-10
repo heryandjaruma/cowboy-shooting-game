@@ -124,6 +124,13 @@ final class SpectatorBroadcaster {
         broadcast()
     }
 
+    /// Forward a channel-tagged event (e.g. audio sync) to everyone watching.
+    func relay(channel: UInt8, body: Data) {
+        var payload = Data([channel])
+        payload.append(body)
+        for connection in connections { send(payload, to: connection) }
+    }
+
     private func broadcast() {
         for connection in connections { send(to: connection) }
     }
@@ -131,6 +138,10 @@ final class SpectatorBroadcaster {
     private func send(to connection: NWConnection) {
         var payload = Data([GameChannel.spectate.rawValue])
         payload.append(snapshot.encoded())
+        send(payload, to: connection)
+    }
+
+    private func send(_ payload: Data, to connection: NWConnection) {
         let message = NWProtocolFramer.Message(gameMessageType: .gameEvent)
         let context = NWConnection.ContentContext(identifier: "spectate", metadata: [message])
         connection.send(content: payload,
@@ -221,9 +232,17 @@ final class SpectatorClient: ObservableObject {
 
             Task { @MainActor [weak self] in
                 guard let self else { return }
-                if type == .gameEvent, data.first == GameChannel.spectate.rawValue,
-                   let snapshot = SpectatorSnapshot(decoding: Data(data.dropFirst())) {
-                    self.snapshot = snapshot
+                if type == .gameEvent {
+                    switch data.first {
+                    case GameChannel.spectate.rawValue:
+                        if let snapshot = SpectatorSnapshot(decoding: Data(data.dropFirst())) {
+                            self.snapshot = snapshot
+                        }
+                    case GameChannel.audio.rawValue:
+                        MusicManager.shared.handleSpectatorAudio(Data(data.dropFirst()))
+                    default:
+                        break
+                    }
                 }
                 if error != nil {
                     self.hostDidDisconnect()
@@ -237,6 +256,7 @@ final class SpectatorClient: ObservableObject {
     /// The host went away (duel ended, or they left) — go back to browsing.
     private func hostDidDisconnect() {
         guard connection != nil else { return } // already torn down locally
+        MusicManager.shared.stop(fade: true)    // silence the relayed duel audio
         startBrowsing() // its stop() clears the dead connection
     }
 

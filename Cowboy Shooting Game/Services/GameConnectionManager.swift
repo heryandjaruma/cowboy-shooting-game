@@ -313,6 +313,12 @@ final class GameConnectionManager: ObservableObject {
         spectatorBroadcaster?.updateLives(hostLives: hostLives, joinerLives: joinerLives)
     }
 
+    /// Host only: forward a channel-tagged event to spectators (audio sync, etc.).
+    /// A no-op on the joiner, where no broadcaster exists.
+    func relayToSpectators(channel: UInt8, body: Data) {
+        spectatorBroadcaster?.relay(channel: channel, body: body)
+    }
+
     private func sendHandshake() {
         send(Data(myName.utf8), as: .handshake)
     }

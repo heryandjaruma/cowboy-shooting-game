@@ -19,8 +19,7 @@ struct MainMenuView: View {
 
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
-        MenuOption(targetDestination: .joinGame),
-        MenuOption(targetDestination: .spectateGame)
+        MenuOption(targetDestination: .joinGame)
     ]
 
     var body: some View {
@@ -115,6 +114,22 @@ struct MainMenuView: View {
                     }
                     Spacer()
                 }.padding(.top, 20)
+
+                // Spectator mode — a quiet corner button for the third phone.
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            path.append(MenuDestination.spectateGame)
+                        } label: {
+                            Text("👀")
+                        }
+                        .buttonStyle(.cowboyIcon)
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
+                    }
+                }
             }
             .navigationDestination(for: MenuDestination.self) { destination in
                 switch destination {

@@ -52,10 +52,14 @@ final class MusicManager: ObservableObject {
     // Timer that fires every 2 s on the host side to push a heartbeat to the joiner.
     private var heartbeatTimer: Timer?
 
-    // Audio sync message op-code (only one op so far — sync/seek).
+    // Audio sync message op-codes.
     private enum AudioOp {
-        static let sync: UInt8 = 0
+        static let sync: UInt8 = 0   // music track + position
+        static let voice: UInt8 = 1  // one-shot announcer line (spectator link only)
     }
+
+    // One-shot announcer line relayed to spectators (e.g. ReadyForShowdownSFX).
+    private var voicePlayer: AVAudioPlayer?
 
     // Drift smaller than this is inaudible; only correct if it exceeds this threshold.
     private static let driftThreshold: Double = 0.05  // seconds
@@ -159,6 +163,24 @@ final class MusicManager: ObservableObject {
         var body = Data([AudioOp.sync, track.id])
         body += BinaryCoding.encode(hostStartNanos)
         gcm.sendEvent(channel: GameChannel.audio.rawValue, body: body)
+
+        // Spectators get elapsed-in-track instead of a host timestamp — their
+        // link has no clock sync, and one-way LAN latency is well below the
+        // drift threshold; the heartbeat keeps correcting them anyway.
+        // Lobby music stays local: spectators hear only the duel's audio.
+        guard track != .lobby else { return }
+        let elapsed = DispatchTime.now().uptimeNanoseconds - hostStartNanos
+        var relayBody = Data([AudioOp.sync, track.id])
+        relayBody += BinaryCoding.encode(elapsed)
+        gcm.relayToSpectators(channel: GameChannel.audio.rawValue, body: relayBody)
+    }
+
+    /// Host: relay a one-shot announcer line (e.g. "Ready for showdown") to
+    /// spectators so they hear the round beats too. A no-op on the joiner.
+    func relayVoiceLineToSpectators(_ resource: String) {
+        var body = Data([AudioOp.voice])
+        body.append(Data(resource.utf8))
+        connectionManager?.relayToSpectators(channel: GameChannel.audio.rawValue, body: body)
     }
 
     private func startHeartbeat() {
@@ -201,6 +223,49 @@ final class MusicManager: ObservableObject {
             ? Double(nowNanos - localStartNanos) / 1_000_000_000
             : 0.0
 
+        syncPlayback(track: track, expectedPosition: expectedPosition)
+    }
+
+    // MARK: - Spectator: receive relayed audio
+
+    /// Apply an audio event relayed over the spectator link: either a music
+    /// sync (track + elapsed seconds) or a one-shot announcer line.
+    func handleSpectatorAudio(_ body: Data) {
+        switch body.first {
+        case AudioOp.sync:
+            // body: [op][trackId][elapsedNanos:UInt64 = 8 bytes] = 10 bytes
+            guard body.count >= 10,
+                  let track = MusicTrack.from(id: body[1]),
+                  let elapsedNanos = BinaryCoding.decodeU64(Data(body.dropFirst(2))) else { return }
+            syncPlayback(track: track, expectedPosition: Double(elapsedNanos) / 1_000_000_000)
+        case AudioOp.voice:
+            playVoiceLine(named: String(decoding: body.dropFirst(), as: UTF8.self))
+        default:
+            break
+        }
+    }
+
+    private func playVoiceLine(named resource: String) {
+        let url = Bundle.main.url(forResource: resource, withExtension: "mp3")
+            ?? Bundle.main.url(forResource: resource, withExtension: "m4a")
+        guard let url else {
+            print("Missing voice line: \(resource)")
+            return
+        }
+        do {
+            let player = try AVAudioPlayer(contentsOf: url)
+            player.volume = AppSettings.sfxVolume
+            player.prepareToPlay()
+            player.play()
+            voicePlayer = player
+        } catch {
+            print("Failed to play voice line \(resource): \(error)")
+        }
+    }
+
+    /// Start `track` at `expectedPosition`, or drift-correct if it's already
+    /// the current track. Shared by the joiner and spectator sync paths.
+    private func syncPlayback(track: MusicTrack, expectedPosition: Double) {
         if currentTrack == track, let player {
             // Same track already playing — drift correction only (no fade, inaudible seek).
             let drift = expectedPosition - player.currentTime
