@@ -265,12 +265,18 @@ final class MusicManager: ObservableObject {
 
     /// Start `track` at `expectedPosition`, or drift-correct if it's already
     /// the current track. Shared by the joiner and spectator sync paths.
+    ///
+    /// `expectedPosition` is elapsed time since the sender started the track and
+    /// keeps growing while the track loops, so it must be wrapped into the
+    /// file's duration — seeking past the end makes AVAudioPlayer silently
+    /// refuse to play.
     private func syncPlayback(track: MusicTrack, expectedPosition: Double) {
         if currentTrack == track, let player {
             // Same track already playing — drift correction only (no fade, inaudible seek).
-            let drift = expectedPosition - player.currentTime
+            let target = Self.wrapped(expectedPosition, into: player.duration)
+            let drift = target - player.currentTime
             if abs(drift) > Self.driftThreshold {
-                player.currentTime = expectedPosition
+                player.currentTime = target
             }
         } else {
             // Different (or no) track — start it and seek directly to the synced position.
@@ -281,7 +287,7 @@ final class MusicManager: ObservableObject {
                 let newPlayer = try AVAudioPlayer(contentsOf: url)
                 newPlayer.numberOfLoops = -1
                 newPlayer.prepareToPlay()
-                newPlayer.currentTime = expectedPosition
+                newPlayer.currentTime = Self.wrapped(expectedPosition, into: newPlayer.duration)
                 newPlayer.volume = 0
                 player?.stop()
                 newPlayer.play()
@@ -292,6 +298,11 @@ final class MusicManager: ObservableObject {
                 print("Audio sync playback error: \(error)")
             }
         }
+    }
+
+    private static func wrapped(_ position: Double, into duration: Double) -> Double {
+        guard duration > 0 else { return 0 }
+        return position.truncatingRemainder(dividingBy: duration)
     }
 
     // MARK: - Fade helpers

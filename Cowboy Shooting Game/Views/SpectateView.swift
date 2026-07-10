@@ -62,6 +62,7 @@ struct SpectateView: View {
                 RoundBangOverlay(result: roundResult) {
                     withAnimation(.easeOut(duration: 0.4)) { self.roundResult = nil }
                 }
+                .id(roundResult.id) // a fresh result restarts the whole sequence
                 .transition(.opacity)
             }
         }
@@ -173,13 +174,15 @@ private func heartsRow(lives: Int, size: CGFloat = 34) -> some View {
     }
 }
 
-/// Full-screen round-result overlay: dimmed backdrop, the winner's shot stamps
-/// the Bang artwork onto the loser's name, then the lost heart flips over.
-/// Self-contained — reads nothing from the live board underneath.
+/// Full-screen round-result overlay: dimmed backdrop, the winner's revolver
+/// swings up, levels at the loser, and fires — the Bang artwork stamps onto
+/// the loser's name and the lost heart flips over. Self-contained — reads
+/// nothing from the live board underneath.
 private struct RoundBangOverlay: View {
     let result: RoundResult
     let onFinished: () -> Void
 
+    @State private var gunLeveled = false
     @State private var bangVisible = false
     @State private var heartLost = false
 
@@ -188,19 +191,44 @@ private struct RoundBangOverlay: View {
             Color.black.opacity(0.7)
                 .ignoresSafeArea()
 
-            HStack(spacing: 48) {
+            HStack(spacing: 32) {
                 column(name: result.hostName, isLoser: result.loserIsHost)
+                gun
                 column(name: result.joinerName, isLoser: !result.loserIsHost)
             }
         }
         .task {
-            try? await Task.sleep(for: .seconds(0.35))
+            try? await Task.sleep(for: .seconds(0.3))
+            // Swing the revolver down from the draw until it levels at the loser…
+            withAnimation(.easeOut(duration: 0.4)) { gunLeveled = true }
+            try? await Task.sleep(for: .seconds(0.55))
+            // …fire: Bang stamps the loser's name, the gun kicks with recoil.
             withAnimation(.spring(response: 0.3, dampingFraction: 0.55)) { bangVisible = true }
             try? await Task.sleep(for: .seconds(0.55))
             withAnimation(.easeOut(duration: 0.3)) { heartLost = true }
-            try? await Task.sleep(for: .seconds(1.4))
+            // Hold the end result so people can take it in.
+            try? await Task.sleep(for: .seconds(1.8))
             onFinished()
         }
+    }
+
+    /// The winner's revolver, aimed across at the loser. The asset points left,
+    /// so mirror it when the loser sits on the right. Rotation is applied
+    /// before the mirror, which flips the swing and recoil along with it.
+    private var gun: some View {
+        Image("Peacemaker_gun")
+            .resizable()
+            .interpolation(.none)
+            .scaledToFit()
+            .frame(width: 130)
+            .rotationEffect(.degrees(gunRotation))
+            .scaleEffect(x: result.loserIsHost ? 1 : -1, y: 1)
+    }
+
+    /// Muzzle up at the draw (+55°), level to aim (0°), kick up on the shot.
+    private var gunRotation: Double {
+        if bangVisible { return 18 }
+        return gunLeveled ? 0 : 55
     }
 
     private func column(name: String, isLoser: Bool) -> some View {
@@ -216,7 +244,8 @@ private struct RoundBangOverlay: View {
                             .scaledToFit()
                             .frame(width: 150)
                             .rotationEffect(.degrees(-12))
-                            .offset(x: 30, y: -24)
+                            // Toward the gun in the middle, whichever side that is.
+                            .offset(x: result.loserIsHost ? 30 : -30, y: -24)
                             .transition(.scale(scale: 3).combined(with: .opacity))
                     }
                 }
