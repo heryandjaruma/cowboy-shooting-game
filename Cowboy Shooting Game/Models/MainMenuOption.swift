@@ -15,13 +15,15 @@ struct MenuOption: Identifiable {
 enum MenuDestination: Hashable {
     case createGame
     case joinGame
+    case spectateGame
     case settingsGame
     case helpGame
- 
+
     var title: LocalizedStringResource {
         switch self {
         case .createGame: "Create Game"
         case .joinGame: "Join Game"
+        case .spectateGame: "Spectate"
         case .settingsGame: "Settings"
         case .helpGame: "Help"
         }

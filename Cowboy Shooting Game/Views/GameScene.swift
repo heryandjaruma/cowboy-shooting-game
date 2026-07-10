@@ -761,6 +761,8 @@ class GameScene: SKScene {
     /// starts only when BOTH devices get here (the both-ready gate), which is
     /// what keeps the shared schedule in sync.
     private func startRoundWithShowdownCall() {
+        // Spectators hear the announcer too (relayed only from the host).
+        MusicManager.shared.relayVoiceLineToSpectators("ReadyForShowdownSFX")
         playVoiceLine("ReadyForShowdownSFX") { [weak self] in
             self?.countdownController.pressReady()
         }

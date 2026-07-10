@@ -44,6 +44,9 @@ final class MatchController: ObservableObject {
         connection.onEvent(channel: GameChannel.life.rawValue) { [weak self] body in
             self?.handleIncoming(body)
         }
+
+        // Fresh match (or rematch) — let spectators see the full 3-3 tally.
+        connection.updateSpectatorLives(hostLives: hostLives, joinerLives: joinerLives)
         
         shot.$outcome
             .compactMap { $0 }
@@ -65,7 +68,8 @@ final class MatchController: ObservableObject {
         }
         myLives = hostLives
         opponentLives = joinerLives
-        
+        connection.updateSpectatorLives(hostLives: hostLives, joinerLives: joinerLives)
+
         if hostLives == 0 || joinerLives == 0 {
             let joinerWon = hostLives == 0
             connection.sendEvent(channel: GameChannel.life.rawValue,

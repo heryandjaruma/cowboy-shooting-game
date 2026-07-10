@@ -5,6 +5,7 @@
 	<key>NSBonjourServices</key>
 	<array>
 		<string>_cowboyduel._tcp</string>
+		<string>_cowboyduel-spec._tcp</string>
 	</array>
 	<key>UIAppFonts</key>
 	<array>

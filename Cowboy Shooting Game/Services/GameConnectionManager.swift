@@ -122,6 +122,9 @@ final class GameConnectionManager: ObservableObject {
     private var browser: NWBrowser?
     private var connection: NWConnection?
 
+    /// Host only: fan-out of name/lives snapshots to watching devices.
+    private var spectatorBroadcaster: SpectatorBroadcaster?
+
     init(myName: String? = nil) {
         self.nameOverride = myName
         if myName == nil { Self.ensureAutoName() }
@@ -155,6 +158,8 @@ final class GameConnectionManager: ObservableObject {
         stopAll()
         isHost = true
         isClockSynced = true // the host clock is the reference.
+        spectatorBroadcaster = SpectatorBroadcaster(hostName: myName)
+        spectatorBroadcaster?.start()
         beginAdvertising()
     }
 
@@ -302,6 +307,18 @@ final class GameConnectionManager: ObservableObject {
     /// High-frequency snapshot (position / aim). Latest-value-wins in spirit.
     func sendPlayerState(_ payload: Data) { send(payload, as: .playerState) }
 
+    /// Host (referee) only: push the current lives tally to any spectators.
+    /// A no-op on the joiner, where no broadcaster exists.
+    func updateSpectatorLives(hostLives: Int, joinerLives: Int) {
+        spectatorBroadcaster?.updateLives(hostLives: hostLives, joinerLives: joinerLives)
+    }
+
+    /// Host only: forward a channel-tagged event to spectators (audio sync, etc.).
+    /// A no-op on the joiner, where no broadcaster exists.
+    func relayToSpectators(channel: UInt8, body: Data) {
+        spectatorBroadcaster?.relay(channel: channel, body: body)
+    }
+
     private func sendHandshake() {
         send(Data(myName.utf8), as: .handshake)
     }
@@ -354,6 +371,7 @@ final class GameConnectionManager: ObservableObject {
         case .handshake:
             let name = String(decoding: data, as: UTF8.self)
             state = .connected(peerName: name.isEmpty ? "Opponent" : name)
+            spectatorBroadcaster?.setJoinerName(name.isEmpty ? "Opponent" : name)
         case .gameEvent:
             guard let channel = data.first else { break }
             eventHandlers[channel]?(Data(data.dropFirst()))
@@ -434,6 +452,7 @@ final class GameConnectionManager: ObservableObject {
         connection = nil
 
         if isHost {
+            spectatorBroadcaster?.reset() // spectators see a fresh 3-3 lobby again.
             resumeHosting() // stay in the room, wait for another challenger.
         } else {
             state = .idle   // the host left — back to the lobby.
@@ -444,6 +463,8 @@ final class GameConnectionManager: ObservableObject {
     func stopAll() {
         connection?.cancel()
         connection = nil
+        spectatorBroadcaster?.stop()
+        spectatorBroadcaster = nil
         listener?.cancel()
         listener = nil
         browser?.cancel()
@@ -457,7 +478,8 @@ final class GameConnectionManager: ObservableObject {
     // MARK: - Parameters
 
     /// TCP + peer-to-peer (Wi-Fi/AWDL) with our custom framing on top.
-    private static func makeParameters() -> NWParameters {
+    /// Also used by the spectator link (SpectatorService) so both speak GameProtocol.
+    static func makeParameters() -> NWParameters {
         let tcp = NWProtocolTCP.Options()
         tcp.enableKeepalive = true
         tcp.keepaliveIdle = 2

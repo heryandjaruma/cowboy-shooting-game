@@ -122,6 +122,22 @@ struct MainMenuView: View {
                     }
                     Spacer()
                 }.padding(.top, 20)
+
+                // Spectator mode — a quiet corner button for the third phone.
+                VStack {
+                    Spacer()
+                    HStack {
+                        Spacer()
+                        Button {
+                            path.append(MenuDestination.spectateGame)
+                        } label: {
+                            Text("👀")
+                        }
+                        .buttonStyle(.cowboyIcon)
+                        .padding(.trailing, 20)
+                        .padding(.bottom, 20)
+                    }
+                }
             }
             .navigationDestination(for: MenuDestination.self) { destination in
                 switch destination {
@@ -129,6 +145,8 @@ struct MainMenuView: View {
                     CreateGameView(connection: connection)
                 case .joinGame:
                     JoinGameView(connection: connection)
+                case .spectateGame:
+                    SpectateView()
                 case .helpGame:
                     HelpView()
                 case .settingsGame:
