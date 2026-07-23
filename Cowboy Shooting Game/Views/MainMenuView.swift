@@ -8,9 +8,11 @@
 import SwiftUI
 import GameKit
 import Lottie
+import StoreKit
 
 struct MainMenuView: View {
     @EnvironmentObject private var gameCenterManager: GameCenterManager
+    @Environment(\.requestReview) private var requestReview
     @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
@@ -41,7 +43,6 @@ struct MainMenuView: View {
                 VStack(spacing: 16) {
                     TitleView()
                         .padding(.top, 20)
-
                     VStack(spacing: 9) {
                         ForEach(menuOptions) { option in
                             Button {
@@ -182,16 +183,18 @@ struct MainMenuView: View {
         // Pushing a child onto the NavigationStack does NOT fire this view's
         // onDisappear (the stack container stays mounted), so drive the access point
         // off the actual navigation state instead: visible only at the root.
-        .onChange(of: path) { _, _ in syncAccessPoint() }
+        .onChange(of: path) { _, newPath in
+            syncAccessPoint()
+            // Back at the menu root: if a duel just finished (win or lose), this
+            // is the natural pause to ask for a review. Practice mode and plain
+            // browsing never arm it, so they can't trigger the prompt here.
+            if newPath.isEmpty { requestReviewAfterMatchIfNeeded() }
+        }
         .onChange(of: showDrawPoseTest) { _, _ in syncAccessPoint() }
         .onChange(of: showLeaderboard) { _, _ in syncAccessPoint() }
         // Auth can complete asynchronously after this view has already appeared.
         .onChange(of: gameCenterManager.isAuthenticated) { _, _ in syncAccessPoint() }
     }
-
-    /// The Game Center access point (top-leading "rocket" badge) belongs to the menu
-    /// only: shown when authenticated and sitting at the navigation root, hidden the
-    /// moment we push a destination or present the pose-test cover.
     private var shouldShowAccessPoint: Bool {
         gameCenterManager.isAuthenticated && path.isEmpty && !showDrawPoseTest && !showLeaderboard
     }
@@ -199,6 +202,17 @@ struct MainMenuView: View {
     private func syncAccessPoint() {
         GKAccessPoint.shared.location = .topLeading
         GKAccessPoint.shared.isActive = shouldShowAccessPoint
+    }
+
+    /// Offers the native review prompt once, if a completed match armed it. A
+    /// short delay lets the return-to-menu transition settle before StoreKit
+    /// tries to present — it silently no-ops if the scene isn't ready yet.
+    private func requestReviewAfterMatchIfNeeded() {
+        guard ReviewManager.shared.consumePendingRequest() else { return }
+        Task {
+            try? await Task.sleep(for: .seconds(0.6))
+            requestReview()
+        }
     }
 }
 
