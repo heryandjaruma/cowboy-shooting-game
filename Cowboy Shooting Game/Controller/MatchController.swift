@@ -148,5 +148,8 @@ final class MatchController: ObservableObject {
         if won {
             GameCenterManager.shared.reportWin()
         }
+        // A real duel just ended (win or lose) — arm the review prompt so the
+        // main menu can offer it once the player returns to the lobby.
+        ReviewManager.shared.matchDidComplete()
     }
 }
