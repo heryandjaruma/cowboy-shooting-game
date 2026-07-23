@@ -67,7 +67,7 @@ struct MainMenuView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        HStack(spacing: 12) 
+                        HStack(spacing: 12) {
                             Button {
                                 showDrawPoseTest = true
                             } label: {
