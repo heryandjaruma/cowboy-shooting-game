@@ -67,16 +67,13 @@ struct MainMenuView: View {
                 VStack {
                     HStack {
                         Spacer()
-                        HStack(spacing: 12) {
-                            #if DEBUG
-                            // Dev-only practice range for the draw pose gate.
+                        HStack(spacing: 12) 
                             Button {
                                 showDrawPoseTest = true
                             } label: {
                                 Text("🎯")
                             }
                             .buttonStyle(.cowboyIcon)
-                            #endif
 
                             Button {
                                 showNamePrompt = true
