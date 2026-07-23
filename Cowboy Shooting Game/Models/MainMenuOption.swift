@@ -18,6 +18,7 @@ enum MenuDestination: Hashable {
     case spectateGame
     case settingsGame
     case helpGame
+    case creditsGame
 
     var title: LocalizedStringResource {
         switch self {
@@ -26,6 +27,7 @@ enum MenuDestination: Hashable {
         case .spectateGame: "Spectate"
         case .settingsGame: "Settings"
         case .helpGame: "Help"
+        case .creditsGame: "Credits"
         }
     }
 }

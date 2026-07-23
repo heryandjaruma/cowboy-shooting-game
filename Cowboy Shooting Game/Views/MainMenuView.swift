@@ -122,18 +122,26 @@ struct MainMenuView: View {
                     }
                     Spacer()
                 }.padding(.top, 20)
-
-                // Spectator mode — a quiet corner button for the third phone.
+                
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button {
-                            path.append(MenuDestination.spectateGame)
-                        } label: {
-                            Text("👀")
+                        HStack(spacing: 12) {
+                            Button {
+                                path.append(MenuDestination.creditsGame)
+                            } label: {
+                                Image(systemName: "info")
+                            }
+                            .buttonStyle(.cowboyIcon)
+
+                            Button {
+                                path.append(MenuDestination.spectateGame)
+                            } label: {
+                                Text("👀")
+                            }
+                            .buttonStyle(.cowboyIcon)
                         }
-                        .buttonStyle(.cowboyIcon)
                         .padding(.trailing, 20)
                         .padding(.bottom, 20)
                     }
@@ -151,6 +159,8 @@ struct MainMenuView: View {
                     HelpView()
                 case .settingsGame:
                     SettingsView()
+                case .creditsGame:
+                    CreditsView()
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
