@@ -68,15 +68,12 @@ struct MainMenuView: View {
                     HStack {
                         Spacer()
                         HStack(spacing: 12) {
-                            #if DEBUG
-                            // Dev-only practice range for the draw pose gate.
                             Button {
                                 showDrawPoseTest = true
                             } label: {
                                 Text("🎯")
                             }
                             .buttonStyle(.cowboyIcon)
-                            #endif
 
                             Button {
                                 showNamePrompt = true
@@ -122,18 +119,26 @@ struct MainMenuView: View {
                     }
                     Spacer()
                 }.padding(.top, 20)
-
-                // Spectator mode — a quiet corner button for the third phone.
+                
                 VStack {
                     Spacer()
                     HStack {
                         Spacer()
-                        Button {
-                            path.append(MenuDestination.spectateGame)
-                        } label: {
-                            Text("👀")
+                        HStack(spacing: 12) {
+                            Button {
+                                path.append(MenuDestination.creditsGame)
+                            } label: {
+                                Image(systemName: "info")
+                            }
+                            .buttonStyle(.cowboyIcon)
+
+                            Button {
+                                path.append(MenuDestination.spectateGame)
+                            } label: {
+                                Text("👀")
+                            }
+                            .buttonStyle(.cowboyIcon)
                         }
-                        .buttonStyle(.cowboyIcon)
                         .padding(.trailing, 20)
                         .padding(.bottom, 20)
                     }
@@ -151,6 +156,8 @@ struct MainMenuView: View {
                     HelpView()
                 case .settingsGame:
                     SettingsView()
+                case .creditsGame:
+                    CreditsView()
                 }
             }
             .toolbar(.hidden, for: .navigationBar)
