@@ -35,9 +35,9 @@ struct CreditsView: View {
 
                 VStack(alignment: .leading, spacing: 12) {
                     ForEach(credits) { credit in
-                        (Text(credit.role).foregroundColor(Color.ternaryCSG)
-                            + Text(": ").foregroundColor(Color.ternaryCSG)
-                            + Text(credit.people).foregroundColor(Color.ternaryCSG.opacity(0.7)))
+                        Text(
+                            "\(Text(credit.role).foregroundStyle(Color.ternaryCSG)): \(Text(credit.people).foregroundStyle(Color.ternaryCSG.opacity(0.7)))"
+                        )
                             .font(.bodyCSG)
                             .multilineTextAlignment(.leading)
                             .fixedSize(horizontal: false, vertical: true)

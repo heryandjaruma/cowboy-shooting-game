@@ -8,9 +8,11 @@
 import SwiftUI
 import GameKit
 import Lottie
+import StoreKit
 
 struct MainMenuView: View {
     @EnvironmentObject private var gameCenterManager: GameCenterManager
+    @Environment(\.requestReview) private var requestReview
     @State private var connection = GameConnectionManager()
     @State private var path = NavigationPath()
 
@@ -41,7 +43,6 @@ struct MainMenuView: View {
                 VStack(spacing: 16) {
                     TitleView()
                         .padding(.top, 20)
-
                     VStack(spacing: 9) {
                         ForEach(menuOptions) { option in
                             Button {
@@ -178,6 +179,10 @@ struct MainMenuView: View {
             MusicManager.shared.play(.lobby)
             syncAccessPoint()
         }
+        .task {
+            try? await Task.sleep(for: .seconds(1))
+            requestReview()
+        }
         .onDisappear { syncAccessPoint() }
         // Pushing a child onto the NavigationStack does NOT fire this view's
         // onDisappear (the stack container stays mounted), so drive the access point
@@ -188,10 +193,6 @@ struct MainMenuView: View {
         // Auth can complete asynchronously after this view has already appeared.
         .onChange(of: gameCenterManager.isAuthenticated) { _, _ in syncAccessPoint() }
     }
-
-    /// The Game Center access point (top-leading "rocket" badge) belongs to the menu
-    /// only: shown when authenticated and sitting at the navigation root, hidden the
-    /// moment we push a destination or present the pose-test cover.
     private var shouldShowAccessPoint: Bool {
         gameCenterManager.isAuthenticated && path.isEmpty && !showDrawPoseTest && !showLeaderboard
     }
