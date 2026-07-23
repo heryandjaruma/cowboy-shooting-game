@@ -159,6 +159,9 @@ class GameScene: SKScene {
     }
     
     private func handlePhaseChange(_ phase: CountdownController.Phase) {
+        if case .matchOver = matchController.matchPhase {
+                    return
+                }
         switch phase {
         case .notReady, .waiting:
             drawPoseController.endRound()
@@ -265,22 +268,30 @@ class GameScene: SKScene {
     }
     
     private func showMatchOver(won: Bool) {
-        let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
-        tex.filteringMode = .nearest
-        resultNode.texture = tex
-        resultNode.size = overlaySize(for: tex, height: 170)
-        popIn(resultNode)
+            // 1. Clear out any mid-round UI that might be on screen
+            hideHolsterHint()
+            fireNode.removeAllActions();       fireNode.alpha = 0.0
+            countdownNode.removeAllActions();  countdownNode.alpha = 0.0
+            countdownLabel.removeAllActions(); countdownLabel.alpha = 0.0
+            
+            // 2. Dim the background to indicate the match is over
+            dimmingNode.removeAllActions()
+            dimmingNode.run(SKAction.fadeAlpha(to: 0.7, duration: 0.3))
+            
+            // 3. Show the Win/Lose result graphic
+            resultNode.removeAllActions()
+            let tex = SKTexture(imageNamed: won ? "victory" : "game_over")
+            tex.filteringMode = .nearest
+            resultNode.texture = tex
+            resultNode.size = overlaySize(for: tex, height: 170)
+            popIn(resultNode)
 
-        // Verdict call over the game-over music bed. The music rides the Music
-        // slider and the host's sync heartbeat keeps both devices aligned.
-        playVoiceLine(won ? "VictorySFX" : "GameOverSFX")
-        MusicManager.shared.play(.gameOver)
+            // Verdict call over the game-over music bed.
+            playVoiceLine(won ? "VictorySFX" : "GameOverSFX")
+            MusicManager.shared.play(.gameOver)
 
-        // matchSummaryLabel.text = "YOUR LIVES: \(matchController.myLives)  •  OPPONENT: \(matchController.opponentLives)"
-        // matchSummaryLabel.alpha = 1.0
-
-        showReturnToMenuPrompt()
-    }
+            showReturnToMenuPrompt()
+        }
     
     private func showContinuePrompt() {
         countdownLabel.removeAllActions()

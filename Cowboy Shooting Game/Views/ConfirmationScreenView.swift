@@ -110,22 +110,35 @@ struct ConfirmationScreenView: View {
             }
         }
         .fullScreenCover(isPresented: $navigateToGame, onDismiss: { sceneHolder.scene = nil }) {
-            GeometryReader { geometry in
-                SpriteView(scene: gameScene(size: geometry.size)) // start a SpriteKit view
-                    .ignoresSafeArea()
-                    .onAppear {
-                        MusicManager.shared.play(.gameplay)
+                    GeometryReader { geometry in
+                        // 1. Initialize the scene and cast it to GameScene so we can access its properties
+                        let activeScene = gameScene(size: geometry.size) as! GameScene
+                        
+                        // 2. Wrap the SpriteView and the Pause Menu in a ZStack
+                        ZStack {
+                            SpriteView(scene: activeScene) // start a SpriteKit view
+                                .ignoresSafeArea()
+                                // 3. Physically pause the SpriteKit engine when the menu is open
+                                .onChange(of: activeScene.matchController.isPaused) { _, isPaused in
+                                    activeScene.isPaused = isPaused
+                                }
+                                .onAppear {
+                                    MusicManager.shared.play(.gameplay)
+                                }
+                            
+                            // 4. Layer your new UI on top
+                            PauseMenuView(matchController: activeScene.matchController)
+                        }
                     }
-            }
-            .alert("Connection Lost", isPresented: $showConnectionLostAlert) {
-                Button("Back to Menu") {
-                    navigateToGame = false
-                    onReturnToMenu()
+                    .alert("Connection Lost", isPresented: $showConnectionLostAlert) {
+                        Button("Back to Menu") {
+                            navigateToGame = false
+                            onReturnToMenu()
+                        }
+                    } message: {
+                        Text("The connection to your opponent was lost.")
+                    }
                 }
-            } message: {
-                Text("The connection to your opponent was lost.")
-            }
-        }
     }
     
     // MARK: - Pieces
