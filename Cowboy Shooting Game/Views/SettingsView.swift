@@ -74,50 +74,12 @@ private struct SettingRow: View {
     }
 }
 
-private struct SettingSliderRow: View {
-    let label: LocalizedStringKey
-    @Binding var value: Double
-    var range: ClosedRange<Double> = 0...1
-
-    var body: some View {
-        VStack(alignment: .leading, spacing: 10) {
-            HStack {
-                Text(label)
-                    .font(.headingCSG)
-                    .foregroundColor(Color.ternaryCSG)
-                Spacer()
-                Text("\(Int(value * 100))%")
-                    .font(.headingCSG)
-                    .foregroundColor(Color.ternaryCSG)
-                    .monospacedDigit()
-            }
-
-            Slider(value: $value, in: range)
-                .tint(Color.ternaryCSG)
-        }
-        .padding(16)
-        .background(
-            RoundedRectangle(cornerRadius: 20)
-                .fill(Color.primaryCSG)
-                .overlay(
-                    RoundedRectangle(cornerRadius: 20)
-                        .stroke(Color.ternaryCSG, lineWidth: 3)
-                )
-        )
-    }
-}
-
 struct SettingsView: View {
     @Environment(\.dismiss) private var dismiss
-    @ObservedObject private var triggerController = TriggerController.shared
 
     // Helpers/AppSettings for these
     @AppStorage(AppSettings.languageKey) private var languageCode = AppSettings.defaultLanguageCode
     @AppStorage(AppSettings.grayscaleKey) private var grayscaleEnabled = true
-
-    @AppStorage(AppSettings.musicVolumeKey)   private var musicVolume   = 1.0
-    @AppStorage(AppSettings.sfxVolumeKey)     private var sfxVolume     = 1.0
-    @AppStorage(AppSettings.gunshotVolumeKey) private var gunshotVolume = 1.0
 
     private let grayscaleOptions = ["OFF", "ON"]
 
@@ -156,18 +118,7 @@ struct SettingsView: View {
                         SettingRow(label: "Language", options: AppSettings.languageNames, selection: languageIndex)
                         SettingRow(label: "Grayscale Mode", options: grayscaleOptions, selection: grayscaleIndex)
 
-                        SettingSliderRow(
-                            label: "Master",
-                            value: Binding(
-                                get: { Double(triggerController.state.baselineTrigger) },
-                                set: { triggerController.updateBaseline(Float($0)) }
-                            ),
-                            range: 0.05...0.95
-                        )
-
-                        SettingSliderRow(label: "Music",   value: $musicVolume)
-                        SettingSliderRow(label: "SFX",     value: $sfxVolume)
-                        SettingSliderRow(label: "Gunshot", value: $gunshotVolume)
+                        VolumeSettingsControls()
                     }
                     .padding(.horizontal, 16)
                     .padding(.vertical, 20)
@@ -175,13 +126,6 @@ struct SettingsView: View {
             }
         }
         .toolbar(.hidden, for: .navigationBar)
-        .onChange(of: musicVolume) { _, _ in
-            MusicManager.shared.applyMusicVolume()
-        }
-        // The Master slider sets the DEVICE volume, which needs the hidden
-        // system slider — install it only while this screen is open.
-        .onAppear { triggerController.beginSystemVolumeControl() }
-        .onDisappear { triggerController.endSystemVolumeControl() }
     }
 }
 
