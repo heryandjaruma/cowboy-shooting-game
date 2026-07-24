@@ -34,7 +34,9 @@ struct CowboyButtonJoin: ButtonStyle {
             .font(.system(size: 18, weight: .bold, design: .monospaced))
             .foregroundColor(Color.ternaryCSG)
             .padding()
-            .frame(height: 60)
+            // minHeight (not a fixed height) so a wrapped, multi-line label
+            // grows the button instead of overflowing it.
+            .frame(minHeight: 60)
             .background(
                 RoundedRectangle(cornerRadius:12)
                     .fill(Color.secondaryCSG)

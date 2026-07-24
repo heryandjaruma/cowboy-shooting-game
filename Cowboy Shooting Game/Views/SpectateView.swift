@@ -105,19 +105,26 @@ struct SpectateView: View {
                     .frame(maxWidth: .infinity, alignment: .center)
                     .padding(.vertical, 20)
             } else {
-                VStack(spacing: 12) {
-                    ForEach(client.discoveredHosts) { host in
-                        Button {
-                            client.watch(host)
-                        } label: {
-                            Text(host.name)
-                                .frame(maxWidth: .infinity, alignment: .center)
+                // Scrolls once the list outgrows the box instead of pushing it
+                // off screen; long host names wrap rather than truncate.
+                CowboyScrollView {
+                    VStack(spacing: 12) {
+                        ForEach(client.discoveredHosts) { host in
+                            Button {
+                                client.watch(host)
+                            } label: {
+                                Text(host.name)
+                                    .frame(maxWidth: .infinity, alignment: .center)
+                                    .multilineTextAlignment(.center)
+                                    .fixedSize(horizontal: false, vertical: true)
+                            }
+                            .buttonStyle(.cowboyJoin)
+                            .padding(2)
                         }
-                        .buttonStyle(.cowboyJoin)
-                        .padding(2)
                     }
+                    .padding(.vertical, 4)
                 }
-                .padding(.vertical, 4)
+                .frame(maxHeight: 260)
             }
         }
         .padding(20)
