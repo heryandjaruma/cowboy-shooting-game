@@ -8,6 +8,7 @@
 import SwiftUI
 import GameKit
 import Combine
+import UIKit
 
 @main
 struct Cowboy_Shooting_GameApp: App {
@@ -62,7 +63,7 @@ struct Cowboy_Shooting_GameApp: App {
 }
 
 
-final class GameCenterManager: ObservableObject {
+final class GameCenterManager: NSObject, ObservableObject, GKGameCenterControllerDelegate {
     static let shared = GameCenterManager()
 
     @Published var isAuthenticated = false
@@ -75,7 +76,7 @@ final class GameCenterManager: ObservableObject {
     /// while the player is signed out (they get backfilled on the next submit).
     private static let winCountKey = "gameCenterWinCount"
 
-    private init() {}
+    private override init() { super.init() }
 
     func authenticatePlayer() {
         GKLocalPlayer.local.authenticateHandler = { [weak self] viewController, error in
@@ -118,6 +119,43 @@ final class GameCenterManager: ObservableObject {
                 print("Game Center leaderboard submit error: \(error.localizedDescription)")
             }
         }
+    }
+
+    // MARK: - Presenting the dashboard
+
+    /// Opens the leaderboard dashboard directly via GKGameCenterViewController —
+    /// independent of the floating access point and its active state, so it works
+    /// every time. If the player isn't signed in yet, it retries authentication
+    /// (which surfaces the system sign-in) rather than doing nothing.
+    func presentLeaderboard() {
+        guard GKLocalPlayer.local.isAuthenticated else {
+            authenticatePlayer()
+            return
+        }
+        let dashboard = GKGameCenterViewController(
+            leaderboardID: Self.leaderboardID,
+            playerScope: .global,
+            timeScope: .allTime
+        )
+        dashboard.gameCenterDelegate = self
+        topViewController()?.present(dashboard, animated: true)
+    }
+
+    func gameCenterViewControllerDidFinish(_ gameCenterViewController: GKGameCenterViewController) {
+        gameCenterViewController.dismiss(animated: true)
+    }
+
+    /// The currently-presented view controller to present the dashboard from.
+    private func topViewController() -> UIViewController? {
+        let keyWindow = UIApplication.shared.connectedScenes
+            .compactMap { $0 as? UIWindowScene }
+            .flatMap(\.windows)
+            .first { $0.isKeyWindow }
+        var top = keyWindow?.rootViewController
+        while let presented = top?.presentedViewController {
+            top = presented
+        }
+        return top
     }
 }
 
