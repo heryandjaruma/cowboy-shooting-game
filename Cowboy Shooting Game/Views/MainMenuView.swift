@@ -18,7 +18,6 @@ struct MainMenuView: View {
 
     @State private var showNamePrompt = false
     @State private var showDrawPoseTest = false
-    @State private var showLeaderboard = false
 
     private let menuOptions: [MenuOption] = [
         MenuOption(targetDestination: .createGame),
@@ -83,23 +82,14 @@ struct MainMenuView: View {
                             }
                             .buttonStyle(.cowboyIcon)
 
-                            // Only useful once signed in — presenting the dashboard
-                            // while unauthenticated just shows Game Center's sign-in.
-                            if gameCenterManager.isAuthenticated {
-                                Button {
-                                    showLeaderboard = true
-                                    GKAccessPoint.shared.trigger(
-                                        leaderboardID: GameCenterManager.leaderboardID,
-                                        playerScope: .global,
-                                        timeScope: .allTime
-                                    ) {
-                                        showLeaderboard = false
-                                    }
-                                } label: {
-                                    Image(systemName: "trophy.fill")
-                                }
-                                .buttonStyle(.cowboyIcon)
+                            // Always available: presents the Game Center dashboard
+                            // directly (and re-runs sign-in if not authenticated yet).
+                            Button {
+                                gameCenterManager.presentLeaderboard()
+                            } label: {
+                                Image(systemName: "trophy.fill")
                             }
+                            .buttonStyle(.cowboyIcon)
 
                             Button {
                                 path.append(MenuDestination.helpGame)
@@ -177,31 +167,17 @@ struct MainMenuView: View {
         .onAppear {
             MusicManager.shared.attach(to: connection)
             MusicManager.shared.play(.lobby)
-            syncAccessPoint()
+            // The trophy button is the single Game Center entry point; keep the
+            // system's floating access point off so it can't appear as a stray
+            // "rocket" in the corner that duplicates the button.
+            GKAccessPoint.shared.isActive = false
         }
-        .onDisappear { syncAccessPoint() }
-        // Pushing a child onto the NavigationStack does NOT fire this view's
-        // onDisappear (the stack container stays mounted), so drive the access point
-        // off the actual navigation state instead: visible only at the root.
         .onChange(of: path) { _, newPath in
-            syncAccessPoint()
             // Back at the menu root: if a duel just finished (win or lose), this
             // is the natural pause to ask for a review. Practice mode and plain
             // browsing never arm it, so they can't trigger the prompt here.
             if newPath.isEmpty { requestReviewAfterMatchIfNeeded() }
         }
-        .onChange(of: showDrawPoseTest) { _, _ in syncAccessPoint() }
-        .onChange(of: showLeaderboard) { _, _ in syncAccessPoint() }
-        // Auth can complete asynchronously after this view has already appeared.
-        .onChange(of: gameCenterManager.isAuthenticated) { _, _ in syncAccessPoint() }
-    }
-    private var shouldShowAccessPoint: Bool {
-        gameCenterManager.isAuthenticated && path.isEmpty && !showDrawPoseTest && !showLeaderboard
-    }
-
-    private func syncAccessPoint() {
-        GKAccessPoint.shared.location = .topLeading
-        GKAccessPoint.shared.isActive = shouldShowAccessPoint
     }
 
     /// Offers the native review prompt once, if a completed match armed it. A
