@@ -25,6 +25,9 @@ struct CowboyButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                            if isPressed { SFXManager.shared.play(.buttonTap) }
+                        }
     }
 }
 
@@ -45,6 +48,9 @@ struct CowboyButtonJoin: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.96 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                            if isPressed { SFXManager.shared.play(.buttonTap) }
+                        }
     }
 }
 
@@ -69,6 +75,9 @@ struct CowboyIconButtonStyle: ButtonStyle {
             .scaleEffect(configuration.isPressed ? 0.9 : 1)
             .opacity(configuration.isPressed ? 0.85 : 1)
             .animation(.easeOut(duration: 0.1), value: configuration.isPressed)
+            .onChange(of: configuration.isPressed) { _, isPressed in
+                           if isPressed { SFXManager.shared.play(.buttonTap) }
+                       }
     }
 }
 
